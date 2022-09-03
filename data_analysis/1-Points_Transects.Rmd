@@ -1,0 +1,396 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Points & Transects"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(geosphere)
+library(sf)
+library(sp)
+library(spatstat)
+
+## Set the seed for random sampling
+set.seed(12345)
+```
+
+\newpage
+
+# Load Data
+
+```{r create_df_list Function, include = FALSE}
+#' Creates a list with dataframes as elements for all csv files in inpath
+#' 
+#' @param inpath Path to directory containing csv files to load
+#' 
+#' @return df_list. List of dataframes, each from a different csv
+create_df_list <- function(inpath){
+  
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+  
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+  
+  return(df_list)
+  
+  }
+```
+
+\vspace{10pt}
+
+```{r Import List of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transects.data.path <- "data/data_filtered/"
+GLUE.transects.df.list   <- create_df_list(GLUE.transects.data.path)
+
+## Read in transect rotation angles
+transect.rotation.angle.data <- read_csv(
+	file = "data/transect_rotation_angles.csv",
+	show_col_types = FALSE
+	)
+
+## Read in adjusted sample sizes
+adjusted.sample.size.data <- read_csv(
+	file = "data/adjusted_sample_sizes.csv",
+	show_col_types = FALSE
+	)
+```
+
+\newpage
+
+# Overview
+
+Broad description goes here...
+
+1.  Random points
+2.  Systematic points
+3.  Random transects
+
+
+
+
+\newpage
+# Random Points
+
+Description goes here...
+
+```{r sample_random_points Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+sample_random_points <- function(df, adjusted_sample_size, data_out){
+
+  # Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Get country name
+	country <- df %>% pull(Country) %>% unique()
+	
+	# Set sample size correction value
+	adjusted.sample.size.value <- adjusted_sample_size %>%
+		filter(City == city) %>%
+		select(Adjusted_Random_Points) %>%
+		as.numeric() %>%
+		round(digits = 3)
+	
+	# Set the compete sample size correction
+	adjusted.sample.size <- round(
+		((1 + adjusted.sample.size.value) * length(df$Population)),
+		digits = 0
+		)
+	
+	# Set coordinates of the city center
+	city.center <- st_sfc(
+		st_multipoint(
+			cbind(df$City_Longitude, df$City_Latitude)),
+			crs = 4326
+		)
+	
+	# Set the sampling area
+	sampling.area <- st_buffer(city.center, df$Maximum_Distance*1000)
+
+	# Project the sampling area to generate the operating window (owin)
+	sampling.area.projected <- st_transform(
+		sampling.area,
+		crs = 6345
+		)
+	
+	# Sample random points within the projected sampling area
+	random.points.projected <- st_sample(
+		x = sampling.area.projected,
+		type = "SSI",
+		r = 200, # Minimum separation of 200 m between sites
+		n = adjusted.sample.size
+		) %>%
+		st_set_crs(value = 6345)
+
+	# Set a dataframe with coordinates for the random points
+	# Points are transformed to crs = 4326 for later data analyses
+	random.points.df <- st_transform(random.points.projected, crs = st_crs(4326)) %>%
+		st_coordinates() %>%
+		as_tibble() %>%
+		rename(Random_Point_Longitude = X, Random_Point_Latitude = Y)
+	
+	# Add city to the data
+	random.points.df$City <- city
+	
+	# Add country to the data
+	random.points.df$Country <- country
+	
+	# Reorganize the data
+	random.points.df <- random.points.df %>%
+		select(Country, City, Random_Point_Latitude, Random_Point_Longitude)
+	
+	# Set the outpath for the random points dataframe
+	outpath <- paste0(data_out, city, "_random_points.csv")
+	
+	# Export the random points dataframe
+	write_csv(random.points.df, file = outpath, col_names = TRUE)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r Sample Random Points, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the random points data
+random_points_out <- "data/sampled_random_points/"
+
+## Sample random points for each city
+purrr::walk(
+	GLUE.transects.df.list,
+	sample_random_points,
+	adjusted_sample_size = adjusted.sample.size.data,
+	data_out = random_points_out
+	)
+```
+
+
+
+
+\newpage
+# Systematic Points
+
+Description goes here...
+
+```{r sample_systematic_points Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+sample_systematic_points <- function(df, adjusted_sample_size, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Get country name
+	country <- df %>% pull(Country) %>% unique()
+	
+	# Set length of the transect
+	transect.length <- df$Maximum_Distance %>% unique()
+	
+	# Set sample size correction value
+	adjusted.sample.size.value <- adjusted_sample_size %>%
+		filter(City == city) %>%
+		select(Adjusted_Systematic_Points) %>%
+		as.numeric() %>%
+		round(digits = 3)
+	
+	# Set the compete sample size correction
+	adjusted.sample.size <- round(
+		((1 + adjusted.sample.size.value) * length(df$Population)),
+		digits = 0
+		)
+	
+	# Set coordinates of the city center
+	# Longitude
+	city.center.longitude <- df$City_Longitude %>% unique()
+	# Latitude
+	city.center.latitude <- df$City_Latitude %>% unique()
+	
+	# Set the city center (sfc)
+	city.center.sfc <- st_sfc(
+		st_multipoint(
+			cbind(df$City_Longitude, df$City_Latitude)),
+			crs = 4326
+		)
+	
+	# Set the sampling area
+	sampling.area <- st_buffer(city.center.sfc, df$Maximum_Distance*1000) %>%
+		as_Spatial()
+	
+  # Sample systematic points within a square grid
+	systematic.points.unfiltered <- makegrid(
+		sampling.area,
+		n = adjusted.sample.size,
+		pretty = FALSE
+		)
+	
+	# Only retain systematic points within the sampling area (i.e., sampling radius)
+	systematic.points.working.df <- distGeo(
+		p1 = systematic.points.unfiltered, # Systematic points
+		p2 = c(city.center.longitude, city.center.latitude) # City center
+		) %>%
+		as_tibble() %>%
+		mutate(Distance = value / 1000) %>%
+		bind_cols(systematic.points.unfiltered) %>%
+		filter(Distance < transect.length) %>%
+		rename(Systematic_Point_Longitude = x1, Systematic_Point_Latitude = x2)
+	
+	# Add city to the data
+	systematic.points.working.df$City <- city
+	
+	# Add country to the data
+	systematic.points.working.df$Country <- country
+	
+	# Reorganize the data
+	systematic.points.df <- systematic.points.working.df %>%
+		select(Country, City, Systematic_Point_Latitude, Systematic_Point_Longitude)
+	
+	# Set the outpath for the systematic points dataframe
+	outpath <- paste0(data_out, city, "_systematic_points.csv")
+	
+	# Export the systematic points dataframe
+	write_csv(systematic.points.df, file = outpath, col_names = TRUE)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r Sample Systematic Points, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the systematic points data
+systematic_points_out <- "data/sampled_systematic_points/"
+
+## Sample systematic points for each city
+purrr::walk(
+	GLUE.transects.df.list,
+	sample_systematic_points,
+	adjusted_sample_size = adjusted.sample.size.data,
+	data_out = systematic_points_out
+	)
+```
+
+
+
+
+\newpage
+# Random Transects
+
+Description goes here...
+
+```{r sample_random_transects Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+
+## Set the function
+sample_random_transects <- function(df, rotation_angles, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Set the transect origin
+	transect.origin <- tibble(
+		Origin_Longitude = df$City_Longitude %>% unique(),
+		Origin_Latitude  = df$City_Latitude %>% unique()
+		) %>%
+		as.numeric()
+
+	# Set a random angle
+	random.angle <- runif(
+		n = 1,
+		min = rotation_angles$Minimum_Angle,
+		max = rotation_angles$Maximum_Angle
+		)
+
+	# Rotate the transect by a random angle
+	random.transect.df <- rearrr::rotate_2d(
+		data = df,
+	  degrees = random.angle,
+	  x_col = "Population_Longitude",
+	  y_col = "Population_Latitude",
+	  origin = transect.origin
+		) %>%
+		select(Country, City, Population_Latitude_rotated, Population_Longitude_rotated) %>%
+		rename(Rotated_Latitude = Population_Latitude_rotated,
+				   Rotated_Longitude = Population_Longitude_rotated)
+	
+	# Set the outpath for the random transects dataframe
+	outpath <- paste0(data_out, city, "_random_transect.csv")
+	
+	# Export the random transects dataframe
+	write_csv(random.transect.df, file = outpath, col_names = TRUE)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r Sample Random Transects, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the random transects data
+random_transects_out <- "data/sampled_random_transects/"
+
+## Sample and export random transects for each city
+purrr::walk(
+	GLUE.transects.df.list,
+	sample_random_transects,
+	rotation_angles = transect.rotation.angle.data,
+	data_out = random_transects_out
+	)
+```
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```

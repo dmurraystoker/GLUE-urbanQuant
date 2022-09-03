@@ -1,0 +1,398 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Filter Coordinates"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(MODISTools)
+```
+
+
+\newpage
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates list with dataframes as elements for all CSVs in inpath
+#' 
+#' @param inpath Path to directory containing CSVs to load
+#' 
+#' @return df_list. List of dataframes, each from a different CSV
+create_df_list <- function(inpath){
+  
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+  
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+  
+  return(df_list)
+  
+  }
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+# Load all random points dataframes as a list
+random.points.data.path <- "data/sampled_random_points/"
+random.points.df.list   <- create_df_list(random.points.data.path)
+
+## Load all systematic points dataframes as a list
+systematic.points.data.path <- "data/sampled_systematic_points/"
+systematic.points.df.list   <- create_df_list(systematic.points.data.path)
+
+## Load all random transects dataframes as a list
+random.transects.data.path <- "data/sampled_random_transects/"
+random.transects.df.list   <- create_df_list(random.transects.data.path)
+```
+
+
+
+
+\newpage
+# Filter Coordinates
+
+Description goes here...
+
+
+## Random Points
+
+```{r filter_random_points Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+filter_random_points <- function(df, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Get country name
+	country <- df %>% pull(Country) %>% unique()
+	
+	# Set coordinates and metadata
+	MODIS.info <- data.frame(
+	"City"      = rep(df$City, 1),
+	"Latitude"  = rep(df[, 3], 1),
+	"Longitude" = rep(df[, 4], 1),
+	"Start"     = c(rep("2018-01-01", length(df[, 1]))),
+	"End"       = c(rep("2018-08-31", length(df[, 1])))
+	)
+	
+	# Set empty dataframe for extracted MODIS data
+	MODIS.data <- data.frame()
+	
+	# Retrieve data from MODIS
+	for(j in 1:length(MODIS.info$City)){
+		## Download the MODIS land cover data for each site
+		MODIS.bands <- mt_subset(
+			product   = "MCD12Q1",
+		  band      = "LW",
+		  lat       = MODIS.info[j, 2],
+		  lon       = MODIS.info[j, 3],
+		  start     = MODIS.info[j, 4],
+		  end       = MODIS.info[j, 5],
+		  site_name = MODIS.info[j, 1],
+		  internal  = TRUE,
+		  progress  = FALSE
+			)
+		
+		## Add MODIS values to the dataframe
+		MODIS.data <- MODIS.data %>%
+			bind_rows(MODIS.bands)
+		}
+	
+	# Only include points over land
+	filtered.coordinates.df <- MODIS.data %>%
+		select(site, longitude, latitude, value) %>%
+		filter(value == 2) %>%
+		rename(City = site, Longitude = longitude, Latitude = latitude) %>%
+		select(-value)
+	
+	# Add country to the data
+	filtered.coordinates.df$Country <- country
+	
+	# Reset rownames
+	rownames(filtered.coordinates.df) <- NULL
+	
+	# Add unique identifier to the data
+	filtered.coordinates.df$UID <- paste(
+		filtered.coordinates.df$City, rownames(filtered.coordinates.df), sep = "."
+		)
+	
+	# Reorganize the data
+	filtered.coordinates.df <- filtered.coordinates.df %>%
+		select(UID, Country, City, Latitude, Longitude)
+	
+	# Set the outpath for the filtered random points dataframe
+	outpath <- paste0(data_out, city, "_filtered_random_points.csv")
+	
+	# Export the filtered dataframe
+	write_csv(filtered.coordinates.df, file = outpath, col_names = TRUE)
+
+	}
+```
+
+\vspace{10pt}
+
+```{r Extract Filtered Random Points, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the filtered random points data
+random_points_out <- "data/filtered_random_points/"
+
+## Filter the random points for each city
+purrr::walk(
+	random.points.df.list,
+	filter_random_points,
+	data_out = random_points_out
+	)
+```
+
+
+
+
+\newpage
+## Systematic Points
+
+```{r filter_systematic_points Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+filter_systematic_points <- function(df, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Get country name
+	country <- df %>% pull(Country) %>% unique()
+	
+	# Set coordinates and metadata
+	MODIS.info <- data.frame(
+	"City"      = rep(df$City, 1),
+	"Latitude"  = rep(df[, 3], 1),
+	"Longitude" = rep(df[, 4], 1),
+	"Start"     = c(rep("2018-01-01", length(df[, 1]))),
+	"End"       = c(rep("2018-08-31", length(df[, 1])))
+	)
+	
+	# Set empty dataframe for extracted MODIS data
+	MODIS.data <- data.frame()
+	
+	# Retrieve data from MODIS
+	for(j in 1:length(MODIS.info$City)){
+		## Download the MODIS land cover data for each site
+		MODIS.bands <- mt_subset(
+			product   = "MCD12Q1",
+		  band      = "LW",
+		  lat       = MODIS.info[j, 2],
+		  lon       = MODIS.info[j, 3],
+		  start     = MODIS.info[j, 4],
+		  end       = MODIS.info[j, 5],
+		  site_name = MODIS.info[j, 1],
+		  internal  = TRUE,
+		  progress  = FALSE
+			)
+		
+		## Add MODIS values to the dataframe
+		MODIS.data <- MODIS.data %>%
+			bind_rows(MODIS.bands)
+		}
+	
+	# Only include points over land
+	filtered.coordinates.df <- MODIS.data %>%
+		select(site, longitude, latitude, value) %>%
+		filter(value == 2) %>%
+		rename(City = site, Longitude = longitude, Latitude = latitude) %>%
+		select(-value)
+	
+	# Add country to the data
+	filtered.coordinates.df$Country <- country
+	
+	# Reset rownames
+	rownames(filtered.coordinates.df) <- NULL
+	
+	# Add unique identifier to the data
+	filtered.coordinates.df$UID <- paste(
+		filtered.coordinates.df$City, rownames(filtered.coordinates.df), sep = "."
+		)
+	
+	# Reorganize the data
+	filtered.coordinates.df <- filtered.coordinates.df %>%
+		select(UID, Country, City, Latitude, Longitude)
+	
+	# Set the outpath for the filtered systematic points dataframe
+	outpath <- paste0(data_out, city, "_filtered_systematic_points.csv")
+	
+	# Export the filtered systematic points dataframe
+	write_csv(filtered.coordinates.df, file = outpath, col_names = TRUE)
+
+	}
+```
+
+\vspace{10pt}
+
+```{r Extract Filtered Systematic Points, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the filtered systematic points data
+systematic_points_out <- "data/filtered_systematic_points/"
+
+## Filter the systematic points for each city
+purrr::walk(
+	systematic.points.df.list,
+	filter_systematic_points,
+	data_out = systematic_points_out
+	)
+```
+
+
+
+
+\newpage
+## Random Transects
+
+```{r filter_random_transects Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+filter_random_transects <- function(df, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Get country name
+	country <- df %>% pull(Country) %>% unique()
+	
+	# Set coordinates and metadata
+	MODIS.info <- data.frame(
+	"City"      = rep(df$City, 1),
+	"Latitude"  = rep(df[, 3], 1),
+	"Longitude" = rep(df[, 4], 1),
+	"Start"     = c(rep("2018-01-01", length(df[, 1]))),
+	"End"       = c(rep("2018-08-31", length(df[, 1])))
+	)
+	
+	# Set empty dataframe for extracted MODIS data
+	MODIS.data <- data.frame()
+	
+	# Retrieve data from MODIS
+	for(j in 1:length(MODIS.info$City)){
+		## Download the MODIS land cover data for each site
+		MODIS.bands <- mt_subset(
+			product   = "MCD12Q1",
+		  band      = "LW",
+		  lat       = MODIS.info[j, 2],
+		  lon       = MODIS.info[j, 3],
+		  start     = MODIS.info[j, 4],
+		  end       = MODIS.info[j, 5],
+		  site_name = MODIS.info[j, 1],
+		  internal  = TRUE,
+		  progress  = FALSE
+			)
+		
+		## Add MODIS values to the dataframe
+		MODIS.data <- MODIS.data %>%
+			bind_rows(MODIS.bands)
+		}
+	
+	# Only include points over land
+	filtered.coordinates.df <- MODIS.data %>%
+		select(site, longitude, latitude, value) %>%
+		filter(value == 2) %>%
+		rename(City = site, Longitude = longitude, Latitude = latitude) %>%
+		select(-value)
+	
+	# Add country to the data
+	filtered.coordinates.df$Country <- country
+	
+	# Reset rownames
+	rownames(filtered.coordinates.df) <- NULL
+	
+	# Add unique identifier to the data
+	filtered.coordinates.df$UID <- paste(
+		filtered.coordinates.df$City, rownames(filtered.coordinates.df), sep = "."
+		)
+	
+	# Reorganize the data
+	filtered.coordinates.df <- filtered.coordinates.df %>%
+		select(UID, Country, City, Latitude, Longitude)
+	
+	# Set the outpath for the filtered random transects dataframe
+	outpath <- paste0(data_out, city, "_filtered_random_transect.csv")
+	
+	# Export the filtered random transects dataframe
+	write_csv(filtered.coordinates.df, file = outpath, col_names = TRUE)
+
+	}
+```
+
+\vspace{10pt}
+
+```{r Extract Filtered Random Transects, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set outpath for the filtered random transects data
+random_transects_out <- "data/filtered_random_transects/"
+
+## Filter the random transects for each city
+purrr::walk(
+	random.transects.df.list,
+	filter_random_transects,
+	data_out = random_transects_out
+	)
+```
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```
+
+
+
+

@@ -1,0 +1,199 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Sample Size Calculations"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+```
+
+
+\newpage
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates list with dataframes as elements for all CSVs in inpath
+#' 
+#' @param inpath Path to directory containing CSVs to load
+#' 
+#' @return df_list. List of dataframes, each from a different CSV
+create_df_list <- function(inpath){
+  
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+  
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+  
+  return(df_list)
+  
+  }
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transects.data.path <- "data/data_filtered/"
+GLUE.transects.df.list   <- create_df_list(GLUE.transects.data.path)
+
+# Load all random points as a list
+random.points.data.path <- "data/filtered_random_points/"
+random.points.df.list   <- create_df_list(random.points.data.path)
+
+## Load all systematic points as a list
+systematic.points.data.path <- "data/filtered_systematic_points/"
+systematic.points.df.list   <- create_df_list(systematic.points.data.path)
+
+## Load all random transects as a list
+random.transects.data.path <- "data/filtered_random_transects/"
+random.transects.df.list   <- create_df_list(random.transects.data.path)
+```
+
+
+
+
+\newpage
+# Sample Size Calculations
+
+Description goes here...
+
+
+```{r calculate_sample_sizes Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+calculate_sample_sizes <- function(
+		GLUE_transects_df, random_points_df, systematic_points_df, random_transect_df){
+	
+	# Get city name
+	City <- GLUE_transects_df %>% pull(City) %>% unique()
+	
+	# Get country name
+	Country <- GLUE_transects_df %>% pull(Country) %>% unique()
+	
+	## Get sample sizes
+	# GLUE transect
+	GLUE_Transect_N <- GLUE_transects_df %>%
+		select(Population) %>%
+		summarise(Count = length(Population)) %>%
+		as.numeric()
+	# Random points
+	Random_Points_N <- random_points_df %>%
+		select(UID) %>%
+		summarise(Count = length(UID)) %>%
+		as.numeric()
+	# Systematic points
+	Systematic_Points_N <- systematic_points_df %>%
+		select(UID) %>%
+		summarise(Count = length(UID)) %>%
+		as.numeric()
+	# Random transects
+	Random_Transect_N <- random_transect_df %>%
+		select(UID) %>%
+		summarise(Count = length(UID)) %>%
+		as.numeric()
+	
+	# Check the difference between GLUE and random transects
+	RT_Minus_GLUE <- (Random_Transect_N - GLUE_Transect_N)
+	
+	## Calculate sample size corrections
+	# Random points
+	Adjusted_Random_Points <- (1 - (Random_Points_N/GLUE_Transect_N)) %>%
+		round(digits = 3)
+	# Systematic points
+	Adjusted_Systematic_Points <- (1 - (Systematic_Points_N/GLUE_Transect_N)) %>%
+		round(digits = 3)
+	
+	## Calculate deficit between GLUE and random transects
+	Random_Transect_Percent_Deficit <- ((RT_Minus_GLUE/GLUE_Transect_N) * 100) %>%
+		round(digits = 3)
+	
+	# Put the tibble together
+	sample_size_correction_summary <- tibble(
+		Country, City, 
+		GLUE_Transect_N, Random_Points_N, Systematic_Points_N, Random_Transect_N,
+		RT_Minus_GLUE, Adjusted_Random_Points, Adjusted_Systematic_Points,
+		Random_Transect_Percent_Deficit
+		)
+	
+	return(sample_size_correction_summary)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r Calculate Sample Sizes, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Calculate sample sizes by mapping over each list of dataframes
+sample.size.summaries <- pmap_dfr(
+	list(GLUE_transects_df = GLUE.transects.df.list, random_points_df = random.points.df.list,
+			 systematic_points_df = systematic.points.df.list, random_transect_df = random.transects.df.list),
+	calculate_sample_sizes
+	)
+```
+
+\vspace{10pt}
+
+```{r Export the Sample Size Summaries, include = FALSE}
+## Export the summary data as a csv file
+write_csv(
+	sample.size.summaries,
+	file = "data/sample_size_summaries.csv"
+	)
+```
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```
+
+
+
+

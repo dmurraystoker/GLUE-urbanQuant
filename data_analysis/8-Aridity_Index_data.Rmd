@@ -1,0 +1,281 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Aridity Index Data"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(raster)
+```
+
+
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates list with dataframes as elements for all CSVs in inpath
+#' 
+#' @param inpath Path to directory containing CSVs to load
+#' 
+#' @return df_list. List of dataframes, each from a different CSV
+create_df_list <- function(inpath){
+  
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+  
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+  
+  return(df_list)
+  
+  }
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transects.data.path <- "data/data_filtered/"
+GLUE.transects.df.list   <- create_df_list(GLUE.transects.data.path)
+
+# Load all random points as a list
+random.points.data.path <- "data/filtered_random_points/"
+random.points.df.list   <- create_df_list(random.points.data.path)
+
+## Load all systematic points as a list
+systematic.points.data.path <- "data/filtered_systematic_points/"
+systematic.points.df.list   <- create_df_list(systematic.points.data.path)
+
+## Load all random transects as a list
+random.transects.data.path <- "data/filtered_random_transects/"
+random.transects.df.list   <- create_df_list(random.transects.data.path)
+```
+
+
+
+
+\newpage
+# Aridity Index Data
+
+Description goes here...
+
+
+
+## Aridity Index Functions
+
+Description goes here...
+
+
+
+
+\newpage
+### calculate_GLUE_transect_AI
+
+```{r calculate_GLUE_transect_AI, Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' V3 of the Aridity Index Available at: 
+#' https://cgiarcsi.community/2019/01/24/global-aridity-index-and-potential-evapotranspiration-climate-database-v3/
+#' 
+#' 
+
+
+calculate_GLUE_transect_AI <- function(df, raster_path, data_out){
+	
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Add fake coordinates for missing data
+	df <- df %>% 
+		mutate(Population_Longitude = ifelse(is.na(Population_Longitude), -999, Population_Longitude),
+					 Population_Latitude = ifelse(is.na(Population_Latitude), -999, Population_Latitude))
+	
+	# Load in raster for country
+	raster <- raster::raster(AI_raster_path)
+	
+	# Create spatial point dataframe from latitude and longitude
+	spdf <- SpatialPointsDataFrame(
+		coords = df %>%
+			dplyr::select(Population_Longitude, Population_Latitude), 
+		proj4string = raster@crs, 
+		data = df
+		)
+	
+	# Calculate aridity index data for population
+	Aridity_Index_data <- raster::extract(x = raster, y = spdf, method = "simple")
+	
+	# Add column with Aridity_Index values
+	df_out <- df %>% 
+		mutate(Aridity_Index = Aridity_Index_data,
+					 Aridity_Index = ifelse(Aridity_Index == 255, NA, Aridity_Index))
+	
+	# Add unique identifier to the data
+	df_out$UID <- paste(df_out$City, df_out$Population, sep = ".")
+		
+	# Reorganize the data
+	df_out <- df_out %>%
+		dplyr::select(UID, Country, City, Aridity_Index)
+	
+	write_csv(df_out, paste0(data_out, city, "_AI.csv"))
+	
+	}
+```
+
+
+
+
+\newpage
+### calculate_points_transects_AI
+
+```{r calculate_points_transects_AI Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' V3 of the Aridity Index Available at: 
+#' https://cgiarcsi.community/2019/01/24/global-aridity-index-and-potential-evapotranspiration-climate-database-v3/
+#' 
+#' 
+
+
+calculate_points_transects_AI <- function(df, raster_path, data_out){
+
+	# Get city name
+	city <- df %>% pull(City) %>% unique()
+	
+	# Add fake coordinates for missing data
+	df <- df %>%
+		mutate(Longitude = ifelse(is.na(Longitude), -999, Longitude),
+					 Latitude = ifelse(is.na(Latitude), -999, Latitude))
+	
+	# Load in raster for country
+	raster <- raster::raster(AI_raster_path)
+	
+	# Create spatial point dataframe from latitude and longitude
+	spdf <- SpatialPointsDataFrame(
+		coords = df %>% 
+			dplyr::select(Longitude, Latitude), 
+		proj4string = raster@crs, 
+		data = df
+		)
+	
+	# Calculate aridity indexx data for population
+	Aridity_Index_data <- raster::extract(x = raster, y = spdf, method = "simple")
+	
+	# Add column with Aridity_Index values
+	df_out <- df %>% 
+		mutate(Aridity_Index = Aridity_Index_data,
+					 Aridity_Index = ifelse(Aridity_Index == 255, NA, Aridity_Index))
+	
+	# Reorganize the data
+	df_out <- df_out %>%
+		dplyr::select(UID, Country, City, Aridity_Index)
+	
+	write_csv(df_out, paste0(data_out, city, "_AI.csv"))
+	
+	}
+```
+
+
+
+
+\newpage
+# Calculate Aridity Index
+
+```{r Calculate Aridity_Index Data, echo = TRUE, results = "hide"}
+## Set inpath for raw Aridity_Index raster dataset
+AI_raster_path <- "raster_files/AI_rasters/ai_v3_yr.tif"
+
+
+## Set data_out for aridity index data
+# GLUE transects
+data_out_1 <- "data/AI_data/GLUE_transects_AI/"
+# Random points
+data_out_2 <- "data/AI_data/random_points_AI/"
+# Systematic points
+data_out_3 <- "data/AI_data/systematic_points_AI/"
+# Random transects
+data_out_4 <- "data/AI_data/random_transects_AI/"
+
+
+## Calculate the aridity index for each site across all sampling types
+# GLUE transects
+purrr::walk(
+	GLUE.transects.df.list,
+	calculate_GLUE_transect_AI, 
+	raster_path = AI_raster_path,
+	data_out = data_out_1
+	)
+# Random points
+purrr::walk(
+	random.points.df.list,
+	calculate_points_transects_AI,
+	raster_path = AI_raster_path,
+	data_out = data_out_2
+	)
+# Systematic points
+purrr::walk(
+	systematic.points.df.list,
+	calculate_points_transects_AI,
+	raster_path = AIx_raster_path,
+	data_out = data_out_3
+	)
+# Random transects
+purrr::walk(
+	random.transects.df.list,
+	calculate_points_transects_AI,
+	raster_path = AI_raster_path,
+	data_out = data_out_4
+	)
+```
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```
+
+
+
+

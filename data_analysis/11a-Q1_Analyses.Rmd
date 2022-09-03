@@ -1,0 +1,4170 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "ESA 2022 Subproject: Analyses (Q1)"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for analyses
+library(broom)
+library(car)
+library(easystats)
+library(emmeans)
+library(ggeffects)
+library(lme4)
+library(lmerTest)
+```
+
+
+
+\newpage
+# Load Data
+
+Description goes here...
+
+
+```{r Load Data, echo = TRUE}
+## Load data
+# Sites and environmental data
+final.data <- read_csv(
+	file = "ESA_2022_subproject/data/analysis_data/final_data-ESA.csv",
+	#col_types = c("ffffnnnnnnnnnnnnnnn"), # With NDVI
+	col_types = c("ffffnnnnnnnnnnnn"), # Without NDVI
+	show_col_types = FALSE
+	)
+```
+
+
+
+
+
+\newpage
+# ANOVAs
+
+Description goes here...
+
+
+\newpage
+## Distance
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Distance, echo = TRUE}
+Distance.ANOVA.model <- lmer(
+	Distance ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Distance ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Distance.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Distance.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Distance.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Distance.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Distance.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Distance.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Distance.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Distance ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Distance.ANOVA.model.table <- anova(
+	object = Distance.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Distance ANOVA Table, echo = FALSE}
+kable(
+	Distance.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Distance ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Distance ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Distance.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Distance ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Distance ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Distance.ANOVA.emmeans <- emmeans(
+	Distance.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Distance ANOVA, echo = FALSE}
+kable(
+	tidy(Distance.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Distance ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Distance ANOVA, echo = FALSE}
+kable(
+	tidy(Distance.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Distance ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Distance ANOVA, echo = FALSE}
+kable(
+	eff_size(Distance.ANOVA.emmeans,
+					 sigma = sigma(Distance.ANOVA.model),
+					 edf = df.residual(Distance.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Distance ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## GMIS
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: GMIS, echo = TRUE}
+GMIS.ANOVA.model <- lmer(
+	log(GMIS_Mean + 1) ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: GMIS ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(GMIS.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(GMIS.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(GMIS.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have tails at the lower and upper limits
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(GMIS.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(GMIS.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(GMIS.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(GMIS.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r GMIS ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+GMIS.ANOVA.model.table <- anova(
+	object = GMIS.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r GMIS ANOVA Table, echo = FALSE}
+kable(
+	GMIS.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the GMIS ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r GMIS ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(GMIS.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the GMIS ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: GMIS ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+GMIS.ANOVA.emmeans <- emmeans(
+	GMIS.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: GMIS ANOVA, echo = FALSE}
+kable(
+	tidy(GMIS.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the GMIS ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: GMIS ANOVA, echo = FALSE}
+kable(
+	tidy(GMIS.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the GMIS ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: GMIS ANOVA, echo = FALSE}
+kable(
+	eff_size(GMIS.ANOVA.emmeans,
+					 sigma = sigma(GMIS.ANOVA.model),
+					 edf = df.residual(GMIS.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the GMIS ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## HII
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: HII, echo = TRUE}
+HII.ANOVA.model <- lmer(
+	sqrt(HII) ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: HII ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(HII.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(HII.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(HII.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(HII.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(HII.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(HII.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(HII.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r HII ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+HII.ANOVA.model.table <- anova(
+	object = HII.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r HII ANOVA Table, echo = FALSE}
+kable(
+	HII.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the HII ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r HII ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(HII.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the HII ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: HII ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+HII.ANOVA.emmeans <- emmeans(
+	HII.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: HII ANOVA, echo = FALSE}
+kable(
+	tidy(HII.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the HII ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: HII ANOVA, echo = FALSE}
+kable(
+	tidy(HII.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the HII ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: HII ANOVA, echo = FALSE}
+kable(
+	eff_size(HII.ANOVA.emmeans,
+					 sigma = sigma(HII.ANOVA.model),
+					 edf = df.residual(HII.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the HII ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Mean NDVI
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Mean NDVI, echo = TRUE, eval = FALSE}
+Mean.NDVI.ANOVA.model <- lmer(
+	Mean_NDVI ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Mean.NDVI.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Mean.NDVI.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Mean.NDVI.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.NDVI.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.NDVI.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Mean.NDVI.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Mean.NDVI.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Mean NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Mean.NDVI.ANOVA.model.table <- anova(
+	object = Mean.NDVI.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Mean.NDVI.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Mean NDVI ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Mean NDVI ANOVA Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Mean.NDVI.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Mean NDVI ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Mean NDVI ANOVA, echo = FALSE, eval = FALSE}
+## Calculate estimated marginal means
+Mean.NDVI.ANOVA.emmeans <- emmeans(
+	Mean.NDVI.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Mean NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Mean.NDVI.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Mean NDVI ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Mean NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Mean.NDVI.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Mean NDVI ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Mean NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	eff_size(Mean.NDVI.ANOVA.emmeans,
+					 sigma = sigma(Mean.NDVI.ANOVA.model),
+					 edf = df.residual(Mean.NDVI.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Mean NDVI ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Min NDVI
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Min NDVI, echo = TRUE, eval = FALSE}
+Min.NDVI.ANOVA.model <- lmer(
+	Min_NDVI ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Min NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Min.NDVI.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Min.NDVI.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Min.NDVI.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Min.NDVI.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Min.NDVI.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Min.NDVI.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Min.NDVI.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Min NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Min.NDVI.ANOVA.model.table <- anova(
+	object = Min.NDVI.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Min.NDVI.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Min NDVI ANOVA.",
+	col.names = c("Sums-of-Squares", "Min-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Min NDVI ANOVA Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Min.NDVI.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Min NDVI ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Min NDVI ANOVA, echo = FALSE, eval = FALSE}
+## Calculate estimated marginal means
+Min.NDVI.ANOVA.emmeans <- emmeans(
+	Min.NDVI.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Min NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Min.NDVI.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Min NDVI ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Min NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Min.NDVI.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Min NDVI ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Min NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	eff_size(Min.NDVI.ANOVA.emmeans,
+					 sigma = sigma(Min.NDVI.ANOVA.model),
+					 edf = df.residual(Min.NDVI.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Min NDVI ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Max NDVI
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Max NDVI, echo = TRUE, eval = FALSE}
+Max.NDVI.ANOVA.model <- lmer(
+	Max_NDVI ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Max NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Max.NDVI.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Max.NDVI.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Max.NDVI.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Max.NDVI.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Max.NDVI.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Max.NDVI.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Max.NDVI.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Max NDVI ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Max.NDVI.ANOVA.model.table <- anova(
+	object = Max.NDVI.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Max.NDVI.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Max NDVI ANOVA.",
+	col.names = c("Sums-of-Squares", "Max-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Max NDVI ANOVA Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Max.NDVI.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Max NDVI ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Max NDVI ANOVA, echo = FALSE, eval = FALSE}
+## Calculate estimated marginal means
+Max.NDVI.ANOVA.emmeans <- emmeans(
+	Max.NDVI.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Max NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Max.NDVI.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Max NDVI ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Max NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	tidy(Max.NDVI.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Max NDVI ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Max NDVI ANOVA, echo = FALSE, eval = FALSE}
+kable(
+	eff_size(Max.NDVI.ANOVA.emmeans,
+					 sigma = sigma(Max.NDVI.ANOVA.model),
+					 edf = df.residual(Max.NDVI.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Max NDVI ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Mean Annual Temperature
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Mean Annual Temperature, echo = TRUE}
+Mean.Annual.Temperature.ANOVA.model <- lmer(
+	Mean_Annual_Temperature ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean Annual Temperature ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Mean.Annual.Temperature.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Mean.Annual.Temperature.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Mean.Annual.Temperature.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have a distinct tail at the lower end
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.Annual.Temperature.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.Annual.Temperature.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Mean.Annual.Temperature.ANOVA.model)
+# Error variance is okay
+
+## Check for outliers
+check_outliers(Mean.Annual.Temperature.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Mean Annual Temperature ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Mean.Annual.Temperature.ANOVA.model.table <- anova(
+	object = Mean.Annual.Temperature.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature ANOVA Table, echo = FALSE}
+kable(
+	Mean.Annual.Temperature.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Mean Annual Temperature ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Mean Annual Temperature ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Mean.Annual.Temperature.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Mean Annual Temperature ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Mean Annual Temperature ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Mean.Annual.Temperature.ANOVA.emmeans <- emmeans(
+	Mean.Annual.Temperature.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Mean Annual Temperature ANOVA, echo = FALSE}
+kable(
+	tidy(Mean.Annual.Temperature.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Mean Annual Temperature ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Mean Annual Temperature ANOVA, echo = FALSE}
+kable(
+	tidy(Mean.Annual.Temperature.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Mean Annual Temperature ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Mean Annual Temperature ANOVA, echo = FALSE}
+kable(
+	eff_size(Mean.Annual.Temperature.ANOVA.emmeans,
+					 sigma = sigma(Mean.Annual.Temperature.ANOVA.model),
+					 edf = df.residual(Mean.Annual.Temperature.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Mean Annual Temperature ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Temperature Seasonality
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Temperature Seasonality, echo = TRUE}
+Temperature.Seasonality.ANOVA.model <- lmer(
+	Temperature_Seasonality ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Temperature Seasonality ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Temperature.Seasonality.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Temperature.Seasonality.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Temperature.Seasonality.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have tails at the lower and upper limits
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Temperature.Seasonality.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Temperature.Seasonality.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Temperature.Seasonality.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Temperature.Seasonality.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Temperature Seasonality ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Temperature.Seasonality.ANOVA.model.table <- anova(
+	object = Temperature.Seasonality.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality ANOVA Table, echo = FALSE}
+kable(
+	Temperature.Seasonality.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Temperature Seasonality ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Temperature Seasonality ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Temperature.Seasonality.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Temperature Seasonality ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Temperature Seasonality ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Temperature.Seasonality.ANOVA.emmeans <- emmeans(
+	Temperature.Seasonality.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Temperature Seasonality ANOVA, echo = FALSE}
+kable(
+	tidy(Temperature.Seasonality.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Temperature Seasonality ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Temperature Seasonality ANOVA, echo = FALSE}
+kable(
+	tidy(Temperature.Seasonality.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Temperature Seasonality ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Temperature Seasonality ANOVA, echo = FALSE}
+kable(
+	eff_size(Temperature.Seasonality.ANOVA.emmeans,
+					 sigma = sigma(Temperature.Seasonality.ANOVA.model),
+					 edf = df.residual(Temperature.Seasonality.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Temperature Seasonality ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Range Annual Temperature
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Range Annual Temperature, echo = TRUE}
+Range.Annual.Temperature.ANOVA.model <- lmer(
+	sqrt(Range_Annual_Temperature) ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Range Annual Temperature ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Range.Annual.Temperature.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Range.Annual.Temperature.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Range.Annual.Temperature.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Range.Annual.Temperature.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Range.Annual.Temperature.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Range.Annual.Temperature.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Range.Annual.Temperature.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Range Annual Temperature ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Range.Annual.Temperature.ANOVA.model.table <- anova(
+	object = Range.Annual.Temperature.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature ANOVA Table, echo = FALSE}
+kable(
+	Range.Annual.Temperature.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Range Annual Temperature ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Range Annual Temperature ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Range.Annual.Temperature.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Range Annual Temperature ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Range Annual Temperature ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Range.Annual.Temperature.ANOVA.emmeans <- emmeans(
+	Range.Annual.Temperature.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Range Annual Temperature ANOVA, echo = FALSE}
+kable(
+	tidy(Range.Annual.Temperature.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Range Annual Temperature ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Range Annual Temperature ANOVA, echo = FALSE}
+kable(
+	tidy(Range.Annual.Temperature.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Range Annual Temperature ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Range Annual Temperature ANOVA, echo = FALSE}
+kable(
+	eff_size(Range.Annual.Temperature.ANOVA.emmeans,
+					 sigma = sigma(Range.Annual.Temperature.ANOVA.model),
+					 edf = df.residual(Range.Annual.Temperature.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Range Annual Temperature ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Annual Precipitation
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Annual Precipitation, echo = TRUE}
+Annual.Precipitation.ANOVA.model <- lmer(
+	Annual_Precipitation ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Annual Precipitation ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Annual.Precipitation.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Annual.Precipitation.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Annual.Precipitation.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have distinct tail at the upper limit
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Annual.Precipitation.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Annual.Precipitation.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Annual.Precipitation.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Annual.Precipitation.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Annual Precipitation ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Annual.Precipitation.ANOVA.model.table <- anova(
+	object = Annual.Precipitation.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation ANOVA Table, echo = FALSE}
+kable(
+	Annual.Precipitation.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Annual Precipitation ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Annual Precipitation ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Annual.Precipitation.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Annual Precipitation ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Annual Precipitation ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Annual.Precipitation.ANOVA.emmeans <- emmeans(
+	Annual.Precipitation.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Annual Precipitation ANOVA, echo = FALSE}
+kable(
+	tidy(Annual.Precipitation.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Annual Precipitation ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Annual Precipitation ANOVA, echo = FALSE}
+kable(
+	tidy(Annual.Precipitation.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Annual Precipitation ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Annual Precipitation ANOVA, echo = FALSE}
+kable(
+	eff_size(Annual.Precipitation.ANOVA.emmeans,
+					 sigma = sigma(Annual.Precipitation.ANOVA.model),
+					 edf = df.residual(Annual.Precipitation.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Annual Precipitation ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Precipitation Seasonality
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Precipitation Seasonality, echo = TRUE}
+Precipitation.Seasonality.ANOVA.model <- lmer(
+	Precipitation_Seasonality ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Precipitation Seasonality ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Precipitation.Seasonality.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Precipitation.Seasonality.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Precipitation.Seasonality.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have distinct tails at the lower and upper limits
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Precipitation.Seasonality.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Precipitation.Seasonality.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Precipitation.Seasonality.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Precipitation.Seasonality.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Precipitation Seasonality ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Precipitation.Seasonality.ANOVA.model.table <- anova(
+	object = Precipitation.Seasonality.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality ANOVA Table, echo = FALSE}
+kable(
+	Precipitation.Seasonality.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Precipitation Seasonality ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Precipitation Seasonality ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Precipitation.Seasonality.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Precipitation Seasonality ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Precipitation Seasonality ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Precipitation.Seasonality.ANOVA.emmeans <- emmeans(
+	Precipitation.Seasonality.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Precipitation Seasonality ANOVA, echo = FALSE}
+kable(
+	tidy(Precipitation.Seasonality.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Precipitation Seasonality ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Precipitation Seasonality ANOVA, echo = FALSE}
+kable(
+	tidy(Precipitation.Seasonality.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Precipitation Seasonality ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Precipitation Seasonality ANOVA, echo = FALSE}
+kable(
+	eff_size(Precipitation.Seasonality.ANOVA.emmeans,
+					 sigma = sigma(Precipitation.Seasonality.ANOVA.model),
+					 edf = df.residual(Precipitation.Seasonality.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Precipitation Seasonality ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+\newpage
+## Aridity Index
+
+### Fit the ANOVA
+
+```{r Fit the ANOVA: Aridity Index, echo = TRUE}
+Aridity.Index.ANOVA.model <- lmer(
+	Aridity_Index ~ Sample_Type + (1 | City),
+	data = final.data,
+	REML = TRUE
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Aridity Index ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Aridity.Index.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Aridity.Index.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(Aridity.Index.ANOVA.model)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals have a distinct tail at the lower and upper limits
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Aridity.Index.ANOVA.model, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Aridity.Index.ANOVA.model, effects = "random")
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Aridity.Index.ANOVA.model)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Aridity.Index.ANOVA.model)
+# No outliers detected
+```
+
+\newpage
+### ANOVA
+
+```{r Aridity Index ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Aridity.Index.ANOVA.model.table <- anova(
+	object = Aridity.Index.ANOVA.model,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index ANOVA Table, echo = FALSE}
+kable(
+	Aridity.Index.ANOVA.model.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table for the Aridity Index ANOVA.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### $\eta^2$ for Fixed Effects
+
+```{r Aridity Index ANOVA Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Aridity.Index.ANOVA.model.table, partial = FALSE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Aridity Index ANOVA.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Aridity Index ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+Aridity.Index.ANOVA.emmeans <- emmeans(
+	Aridity.Index.ANOVA.model,
+	specs = pairwise ~ Sample_Type,
+	weights = "cells",
+	adjust = "none"
+	)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Aridity Index ANOVA, echo = FALSE}
+kable(
+	tidy(Aridity.Index.ANOVA.emmeans$emmeans),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Estimated marginal means of Sample Type in the Aridity Index ANOVA.",
+	col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Aridity Index ANOVA, echo = FALSE}
+kable(
+	tidy(Aridity.Index.ANOVA.emmeans$contrasts),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Pairwise contrasts of Sample Type in the Aridity Index ANOVA.",
+	col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Aridity Index ANOVA, echo = FALSE}
+kable(
+	eff_size(Aridity.Index.ANOVA.emmeans,
+					 sigma = sigma(Aridity.Index.ANOVA.model),
+					 edf = df.residual(Aridity.Index.ANOVA.model)),
+	booktabs = TRUE, 
+	digits = 3, 
+	caption = "Effect sizes for the pairwise contrasts of Sample Type in the Aridity Index ANOVA.",
+	col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+
+\newpage
+# Linear Mixed-Effects Models
+
+Description goes here...
+
+
+\newpage
+## GMIS
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: GMIS LMM, echo = TRUE}
+GMIS.LMM <- lmer(
+	log(GMIS_Mean + 1) ~ Standardized_Distance * Sample_Type
+	                     + (Standardized_Distance | City)
+	                     + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: GMIS LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(GMIS.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(GMIS.LMM)
+# No singularity
+
+## Visual assessment
+check_model(GMIS.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(GMIS.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(GMIS.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.030)
+# Standardized_Distance | City:Sample_Type (Slope) = Good
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.033)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(GMIS.LMM)
+# Error variance appears to be homoscedastic
+
+## Check for outliers
+check_outliers(GMIS.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r GMIS LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(GMIS.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in GMIS from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the GMIS linear mixed-effects model. Note: predictions have not been back-transformed.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r GMIS LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(GMIS.LMM)
+# Marginal = 0.318
+# Conditional = 0.561
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r GMIS LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+GMIS.LMM.anova.table <- anova(
+	object = GMIS.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r GMIS LMM: ANOVA Table, echo = FALSE}
+kable(
+	GMIS.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the GMIS linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r GMIS LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(GMIS.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the GMIS linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r GMIS LMM: ranova, echo = TRUE}
+## Fit a ranova
+GMIS.LMM.ranova <- ranova(
+	GMIS.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r GMIS LMM: ranova Table, echo = FALSE}
+kable(
+	GMIS.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the GMIS linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r GMIS LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(GMIS.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the GMIS linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## HII
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: HII LMM, echo = TRUE}
+HII.LMM <- lmer(
+	HII ~ Standardized_Distance * Sample_Type
+	      + (Standardized_Distance | City)
+	      + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: HII LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(HII.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(HII.LMM)
+# No singularity
+
+## Visual assessment
+check_model(HII.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(HII.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(HII.LMM, effects = "random")
+# City:Sample_Type (Intercept) = Good
+# Standardized_Distance | City:Sample_Type (Slope) = Good
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(HII.LMM)
+# Evidence for heteroscedasticity
+
+## Check for outliers
+check_outliers(HII.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r HII LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(HII.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in HII from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the HII linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r HII LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(HII.LMM)
+# Marginal = 0.237
+# Conditional = 0.639
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r HII LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+HII.LMM.anova.table <- anova(
+	object = HII.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r HII LMM: ANOVA Table, echo = FALSE}
+kable(
+	HII.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the HII linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r HII LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(HII.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the HII linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r HII LMM: ranova, echo = TRUE}
+## Fit a ranova
+HII.LMM.ranova <- ranova(
+	HII.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r HII LMM: ranova Table, echo = FALSE}
+kable(
+	HII.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the HII linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r HII LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(HII.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the HII linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Mean NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Mean NDVI LMM, echo = TRUE, eval = FALSE}
+Mean.NDVI.LMM <- lmer(
+	Mean_NDVI ~ Standardized_Distance * Sample_Type
+	            + (Standardized_Distance | City)
+	            + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Mean.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Mean.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Mean.NDVI.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.NDVI.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.NDVI.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.030)
+# Standardized_Distance | City:Sample_Type (Slope) = Good
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.033)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Mean.NDVI.LMM)
+# Error variance appears to be homoscedastic
+
+## Check for outliers
+check_outliers(Mean.NDVI.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Mean NDVI LMM: Model Predictions Table, echo = FALSE, eval = FALSE}
+kable(
+	emtrends(Mean.NDVI.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Mean NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Mean NDVI linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Mean NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide", eval = FALSE}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Mean.NDVI.LMM)
+# Marginal = X
+# Conditional = X
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Mean NDVI LMM: ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Mean.NDVI.LMM.anova.table <- anova(
+	object = Mean.NDVI.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Mean.NDVI.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Mean NDVI linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Mean NDVI LMM: Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Mean.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Mean NDVI linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Mean NDVI LMM: ranova, echo = TRUE, eval = FALSE}
+## Fit a ranova
+Mean.NDVI.LMM.ranova <- ranova(
+	Mean.NDVI.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: ranova Table, echo = FALSE, eval = FALSE}
+kable(
+	Mean.NDVI.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Mean NDVI linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Mean NDVI LMM: ICC For Random Effects, echo = FALSE, eval = FALSE}
+kable(
+	icc(Mean.NDVI.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Mean NDVI linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Min NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Min NDVI LMM, echo = TRUE, eval = FALSE}
+Min.NDVI.LMM <- lmer(
+	Min_NDVI ~ Standardized_Distance * Sample_Type
+	           + (Standardized_Distance | City)
+	           + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Min NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Min.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Min.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Min.NDVI.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Min.NDVI.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Min.NDVI.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.030)
+# Standardized_Distance | City:Sample_Type (Slope) = Good
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.033)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Min.NDVI.LMM)
+# Error variance appears to be homoscedastic
+
+## Check for outliers
+check_outliers(Min.NDVI.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Min NDVI LMM: Model Predictions Table, echo = FALSE, eval = FALSE}
+kable(
+	emtrends(Min.NDVI.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Min NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Min NDVI linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Min NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide", eval = FALSE}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Min.NDVI.LMM)
+# Marginal = X
+# Conditional = X
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Min NDVI LMM: ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Min.NDVI.LMM.anova.table <- anova(
+	object = Min.NDVI.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Min.NDVI.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Min NDVI linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Min NDVI LMM: Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Min.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Min NDVI linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Min NDVI LMM: ranova, echo = TRUE, eval = FALSE}
+## Fit a ranova
+Min.NDVI.LMM.ranova <- ranova(
+	Min.NDVI.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: ranova Table, echo = FALSE, eval = FALSE}
+kable(
+	Min.NDVI.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Min NDVI linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Min NDVI LMM: ICC For Random Effects, echo = FALSE, eval = FALSE}
+kable(
+	icc(Min.NDVI.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Min NDVI linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Max NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Max NDVI LMM, echo = TRUE, eval = FALSE}
+Max.NDVI.LMM <- lmer(
+	Max_NDVI ~ Standardized_Distance * Sample_Type
+	           + (Standardized_Distance | City)
+	           + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Max NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Max.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Max.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Max.NDVI.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Max.NDVI.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Max.NDVI.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.030)
+# Standardized_Distance | City:Sample_Type (Slope) = Good
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.033)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Max.NDVI.LMM)
+# Error variance appears to be homoscedastic
+
+## Check for outliers
+check_outliers(Max.NDVI.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Max NDVI LMM: Model Predictions Table, echo = FALSE, eval = FALSE}
+kable(
+	emtrends(Max.NDVI.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Max NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Max NDVI linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Max NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide", eval = FALSE}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Max.NDVI.LMM)
+# Marginal = X
+# Conditional = X
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Max NDVI LMM: ANOVA, echo = TRUE, eval = FALSE}
+## Fit an ANOVA with Type III sums-of-squares
+Max.NDVI.LMM.anova.table <- anova(
+	object = Max.NDVI.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: ANOVA Table, echo = FALSE, eval = FALSE}
+kable(
+	Max.NDVI.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Max NDVI linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Max NDVI LMM: Effect Sizes, echo = FALSE, eval = FALSE}
+kable(
+	eta_squared(Max.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Max NDVI linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Max NDVI LMM: ranova, echo = TRUE, eval = FALSE}
+## Fit a ranova
+Max.NDVI.LMM.ranova <- ranova(
+	Max.NDVI.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: ranova Table, echo = FALSE, eval = FALSE}
+kable(
+	Max.NDVI.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Max NDVI linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Max NDVI LMM: ICC For Random Effects, echo = FALSE, eval = FALSE}
+kable(
+	icc(Max.NDVI.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Max NDVI linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Mean Annual Temperature
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Mean Annual Temperature LMM, echo = TRUE}
+Mean.Annual.Temperature.LMM <- lmer(
+	log(Mean_Annual_Temperature + 9.908334) ~ Standardized_Distance * Sample_Type
+	                                          + (Standardized_Distance | City)
+	                                          + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean Annual Temperature LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Mean.Annual.Temperature.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Mean.Annual.Temperature.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Mean.Annual.Temperature.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.Annual.Temperature.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Mean.Annual.Temperature.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P < 0.001)
+# Standardized_Distance | City:Sample_Type (Slope) = non-normality detected (P = 0.011)
+# City (Intercept) = non-normality detected (P = 0.006)
+# Standardized_Distance | City (Slope) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Mean.Annual.Temperature.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Mean.Annual.Temperature.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Mean Annual Temperature LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Mean.Annual.Temperature.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Mean Annual Temperature from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Mean Annual Temperature linear mixed-effects model. Note: predictions have not been back-transformed.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Mean Annual Temperature LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Mean.Annual.Temperature.LMM)
+# Marginal = 0.009
+# Conditional = 0.720
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Mean Annual Temperature LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Mean.Annual.Temperature.LMM.anova.table <- anova(
+	object = Mean.Annual.Temperature.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: ANOVA Table, echo = FALSE}
+kable(
+	Mean.Annual.Temperature.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Mean Annual Temperature linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Mean Annual Temperature LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Mean.Annual.Temperature.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Mean Annual Temperature linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Mean Annual Temperature LMM: ranova, echo = TRUE}
+## Fit a ranova
+Mean.Annual.Temperature.LMM.ranova <- ranova(
+	Mean.Annual.Temperature.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: ranova Table, echo = FALSE}
+kable(
+	Mean.Annual.Temperature.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Mean Annual Temperature linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Mean Annual Temperature LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Mean.Annual.Temperature.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Mean Annual Temperature linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Temperature Seasonality
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Temperature Seasonality LMM, echo = TRUE}
+Temperature.Seasonality.LMM <- lmer(
+	Temperature_Seasonality ~ Standardized_Distance * Sample_Type
+	                          + (1 | City)
+	                          + (1 | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Temperature Seasonality LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Temperature.Seasonality.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Temperature.Seasonality.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Temperature.Seasonality.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Temperature.Seasonality.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Temperature.Seasonality.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.009)
+# City (Intercept) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Temperature.Seasonality.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Temperature.Seasonality.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Temperature Seasonality LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Temperature.Seasonality.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Temperature Seasonality from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Temperature Seasonality linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Temperature Seasonality LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Temperature.Seasonality.LMM)
+# Marginal < 0.001
+# Conditional = 0.997
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Temperature Seasonality LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Temperature.Seasonality.LMM.anova.table <- anova(
+	object = Temperature.Seasonality.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: ANOVA Table, echo = FALSE}
+kable(
+	Temperature.Seasonality.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Temperature Seasonality linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Temperature Seasonality LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Temperature.Seasonality.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Temperature Seasonality linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Temperature Seasonality LMM: ranova, echo = TRUE}
+## Fit a ranova
+Temperature.Seasonality.LMM.ranova <- ranova(
+	Temperature.Seasonality.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: ranova Table, echo = FALSE}
+kable(
+	Temperature.Seasonality.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Temperature Seasonality linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Temperature Seasonality LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Temperature.Seasonality.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Temperature Seasonality linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Range Annual Temperature
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Range Annual Temperature LMM, echo = TRUE}
+Range.Annual.Temperature.LMM <- lmer(
+	log(Range_Annual_Temperature) ~ Standardized_Distance * Sample_Type
+	                                + (Standardized_Distance | City)
+	                                + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Range Annual Temperature LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Range.Annual.Temperature.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Range.Annual.Temperature.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Range.Annual.Temperature.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Range.Annual.Temperature.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Range.Annual.Temperature.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.001)
+# Standardized_Distance | City:Sample_Type (Slope) = non-normality detected (P < 0.001)
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.002)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Range.Annual.Temperature.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Range.Annual.Temperature.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Range Annual Temperature LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Range.Annual.Temperature.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Range Annual Temperature from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Range Annual Temperature linear mixed-effects model. Note: predictions have not been back-transformed.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Range Annual Temperature LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Range.Annual.Temperature.LMM)
+# Marginal = 0.0001
+# Conditional = 0.980
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Range Annual Temperature LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Range.Annual.Temperature.LMM.anova.table <- anova(
+	object = Range.Annual.Temperature.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: ANOVA Table, echo = FALSE}
+kable(
+	Range.Annual.Temperature.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Range Annual Temperature linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Range Annual Temperature LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Range.Annual.Temperature.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Range Annual Temperature linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Range Annual Temperature LMM: ranova, echo = TRUE}
+## Fit a ranova
+Range.Annual.Temperature.LMM.ranova <- ranova(
+	Range.Annual.Temperature.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: ranova Table, echo = FALSE}
+kable(
+	Range.Annual.Temperature.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Range Annual Temperature linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Range Annual Temperature LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Range.Annual.Temperature.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Range Annual Temperature linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Annual Precipitation
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Annual Precipitation LMM, echo = TRUE}
+Annual.Precipitation.LMM <- lmer(
+	log(Annual_Precipitation) ~ Standardized_Distance * Sample_Type
+	                            + (Standardized_Distance | City)
+	                            + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Annual Precipitation LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Annual.Precipitation.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Annual.Precipitation.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Annual.Precipitation.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Annual.Precipitation.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Annual.Precipitation.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P < 0.001)
+# Standardized_Distance | City:Sample_Type (Slope) = non-normality detected (P < 0.001)
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = Good
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Annual.Precipitation.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Annual.Precipitation.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Annual Precipitation LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Annual.Precipitation.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Annual Precipitation from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Annual Precipitation linear mixed-effects model. Note: predictions have not been back-transformed.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Annual Precipitation LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Annual.Precipitation.LMM)
+# Marginal = 0.002
+# Conditional = 0.934
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Annual Precipitation LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Annual.Precipitation.LMM.anova.table <- anova(
+	object = Annual.Precipitation.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: ANOVA Table, echo = FALSE}
+kable(
+	Annual.Precipitation.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Annual Precipitation linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Annual Precipitation LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Annual.Precipitation.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Annual Precipitation linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Annual Precipitation LMM: ranova, echo = TRUE}
+## Fit a ranova
+Annual.Precipitation.LMM.ranova <- ranova(
+	Annual.Precipitation.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: ranova Table, echo = FALSE}
+kable(
+	Annual.Precipitation.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Annual Precipitation linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Annual Precipitation LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Annual.Precipitation.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Annual Precipitation linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Precipitation Seasonality
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Precipitation Seasonality LMM, echo = TRUE}
+Precipitation.Seasonality.LMM <- lmer(
+	Precipitation_Seasonality ~ Standardized_Distance * Sample_Type
+	                            + (Standardized_Distance | City)
+	                            + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Precipitation Seasonality LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Precipitation.Seasonality.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Precipitation.Seasonality.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Precipitation.Seasonality.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Precipitation.Seasonality.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Precipitation.Seasonality.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P = 0.005)
+# Standardized_Distance | City:Sample_Type (Slope) = non-normality detected (P = 0.006)
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.006)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Precipitation.Seasonality.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Precipitation.Seasonality.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Precipitation Seasonality LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Precipitation.Seasonality.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Precipitation Seasonality from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Precipitation Seasonality linear mixed-effects model.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Precipitation Seasonality LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Precipitation.Seasonality.LMM)
+# Marginal = 0.0004
+# Conditional = 0.971
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Precipitation Seasonality LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Precipitation.Seasonality.LMM.anova.table <- anova(
+	object = Precipitation.Seasonality.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: ANOVA Table, echo = FALSE}
+kable(
+	Precipitation.Seasonality.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Precipitation Seasonality linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Precipitation Seasonality LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Precipitation.Seasonality.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Precipitation Seasonality linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Precipitation Seasonality LMM: ranova, echo = TRUE}
+## Fit a ranova
+Precipitation.Seasonality.LMM.ranova <- ranova(
+	Precipitation.Seasonality.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: ranova Table, echo = FALSE}
+kable(
+	Precipitation.Seasonality.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Precipitation Seasonality linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Precipitation Seasonality LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Precipitation.Seasonality.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Precipitation Seasonality linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+\newpage
+## Aridity Index
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Aridity Index LMM, echo = TRUE}
+Aridity.Index.LMM <- lmer(
+	log(Aridity_Index) ~ Standardized_Distance * Sample_Type
+	                     + (Standardized_Distance | City)
+	                     + (Standardized_Distance | City:Sample_Type),
+	data = final.data,
+	REML = TRUE,
+	control = lmerControl(optCtrl = list(maxfun = 100000))
+	)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Aridity Index LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(Aridity.Index.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(Aridity.Index.LMM)
+# No singularity
+
+## Visual assessment
+check_model(Aridity.Index.LMM)
+# Linear assumption met; slight heterogeneity of variance
+# Residuals approximately follow a normal distribution
+# Random effects are normally distributed
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Aridity.Index.LMM, effects = "fixed")
+# Suggests statistical non-normality of residuals
+# Mixed-effects models are robust to this assumption
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(Aridity.Index.LMM, effects = "random")
+# City:Sample_Type (Intercept) = non-normality detected (P < 0.001)
+# Standardized_Distance | City:Sample_Type (Slope) = non-normality detected (P < 0.001)
+# City (Intercept) = Good
+# Standardized_Distance | City (Slope) = non-normality detected (P = 0.009)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(Aridity.Index.LMM)
+# Error variance appears to be heteroscedastic
+
+## Check for outliers
+check_outliers(Aridity.Index.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Predictions
+
+```{r Aridity Index LMM: Model Predictions Table, echo = FALSE}
+kable(
+	emtrends(Aridity.Index.LMM, ~ Sample_Type, var = "Standardized_Distance"),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Predicted change in Aridity Index from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Aridity Index linear mixed-effects model. Note: predictions have not been back-transformed.",
+	col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Aridity Index LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+MuMIn::r.squaredGLMM(Aridity.Index.LMM)
+# Marginal = 0.003
+# Conditional = 0.944
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Aridity Index LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+Aridity.Index.LMM.anova.table <- anova(
+	object = Aridity.Index.LMM,
+	type = "III",
+	ddf = "Kenward-Roger"
+	)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: ANOVA Table, echo = FALSE}
+kable(
+	Aridity.Index.LMM.anova.table,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "ANOVA table for the Aridity Index linear mixed-effects model.",
+	col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Aridity Index LMM: Effect Sizes, echo = FALSE}
+kable(
+	eta_squared(Aridity.Index.LMM.anova.table, partial = TRUE, ci = 0.95),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Effect sizes for the Aridity Index linear mixed-effects model.",
+	col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+	) %>%
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Aridity Index LMM: ranova, echo = TRUE}
+## Fit a ranova
+Aridity.Index.LMM.ranova <- ranova(
+	Aridity.Index.LMM,
+	reduce.terms = FALSE
+	)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: ranova Table, echo = FALSE}
+kable(
+	Aridity.Index.LMM.ranova,
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Summary of the ranova for the Aridity Index linear mixed-effects model.",
+	col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Aridity Index LMM: ICC For Random Effects, echo = FALSE}
+kable(
+	icc(Aridity.Index.LMM, by_group = TRUE),
+	booktabs = TRUE,
+	digits = 3,
+	caption = "Table of the effect sizes for the random effects in the Aridity Index linear mixed-effects model.",
+	col.names = c("Term", "ICC")
+	) %>% 
+	kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+
+
+\newpage
+# Supplementary Analyses
+
+## City-Specific Regressions
+
+Description goes here...
+
+
+```{r Prepare the List of Data, echo = TRUE}
+## Split the data into a list; one dataframe per city
+city.specific.data.list <- final.data %>%
+	group_split(City)
+
+## Set names for each dataframe in the data list
+names(city.specific.data.list) <- c(
+	"Atlanta", "Bogota", "Cape_Town", "Christchurch", "Kyoto", "Lisbon",
+	"Mexico_City", "Montreal", "Santiago", "Shanghai", "Stockholm", "Warsaw"
+	)
+```
+
+
+
+\newpage
+### Set Functions
+
+```{r fit_urbanization_metric_regression Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+fit_urbanization_metric_regression <- function(df, response_variable) {
+	
+	# Set the response variable
+  Response_Variable <- df %>% pull(response_variable)
+	
+	## Fit the linear mixed-effects model
+	fitted.regression <- lm(
+		Response_Variable ~ Standardized_Distance * Sample_Type,
+		data = df
+		)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r urbanization_metric_regression_ANOVA Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+urbanization_metric_regression_ANOVA <- function(fitted_model) {
+	
+	# ANOVA with Type III sums-of-squares
+	regression.anova.table <- Anova(
+		mod = fitted_model,
+		type = "III"
+		)
+	
+	return(regression.anova.table)
+	
+}
+```
+
+\newpage
+
+```{r urbanization_metric_regression_effect_sizes Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+urbanization_metric_regression_effect_sizes <- function(fitted_model) {
+	
+	# Get the adjusted R-squared
+	regression.R.squared <- summary(fitted_model)$adj.r.squared
+	
+	# Effect sizes for the fixed effects
+	regression.eta.squared <- eta_squared(fitted_model, partial = TRUE, ci = 0.95)
+	
+	# Combine the effect sizes into a summary dataframe
+	regression.effect.size.summary.table <- tibble(
+		R2_adjusted = regression.R.squared,
+		eta2_Predictor = regression.eta.squared[1, 2],
+		eta2_Sample_Type = regression.eta.squared[2, 2],
+		eta2_Interaction = regression.eta.squared[3, 2]
+		)
+	
+	return(regression.effect.size.summary.table)
+	
+	}
+```
+
+\vspace{10pt}
+
+```{r deviation_regression_predictions Function, echo = TRUE}
+#' Description goes here...
+#' 
+#' 
+
+## Set the function
+urbanization_metric_regression_predictions <- function(fitted_model) {
+	
+	# Get the predictions from the fitted regression
+	regression.predictions <- ggpredict(
+		model = fitted_model,
+		terms = c("Standardized_Distance", "Sample_Type")
+		) %>%
+	as_tibble() %>%
+	rename(Standardized_Distance = x, Predicted = predicted,
+				 SE = std.error, CI_lower = conf.low, CI_upper = conf.high,
+				 Sample_Type = group)
+	
+	return(regression.predictions)
+	
+	}
+```
+
+
+
+\newpage
+## GMIS
+
+```{r GMIS Regressions & Results, echo = TRUE}
+## Fit the regressions
+GMIS.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "GMIS_Mean"
+	)
+
+## ANOVA
+GMIS.regression.ANOVAs <- map(
+	GMIS.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+GMIS.regression.effect.sizes <- map_dfr(
+	GMIS.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+GMIS.regression.predictions <- map(
+	GMIS.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## HII
+
+```{r HII Regressions & Results, echo = TRUE}
+## Fit the regressions
+HII.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "HII"
+	)
+
+## ANOVA
+HII.regression.ANOVAs <- map(
+	HII.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+HII.regression.effect.sizes <- map(
+	HII.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+HII.regression.predictions <- map(
+	HII.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Mean Annual Temperature
+
+```{r Mean Annual Temperature Regressions & Results, echo = TRUE}
+## Fit the regressions
+Mean.Annual.Temperature.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Mean_Annual_Temperature"
+	)
+
+## ANOVA
+Mean.Annual.Temperature.regression.ANOVAs <- map(
+	Mean.Annual.Temperature.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Mean.Annual.Temperature.regression.effect.sizes <- map_dfr(
+	Mean.Annual.Temperature.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Mean.Annual.Temperature.regression.predictions <- map(
+	Mean.Annual.Temperature.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Temperature Seasonality
+
+```{r Temperature Seasonality Regressions & Results, echo = TRUE}
+## Fit the regressions
+Temperature.Seasonality.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Temperature_Seasonality"
+	)
+
+## ANOVA
+Temperature.Seasonality.regression.ANOVAs <- map(
+	Temperature.Seasonality.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Temperature.Seasonality.regression.effect.sizes <- map(
+	Temperature.Seasonality.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Temperature.Seasonality.regression.predictions <- map(
+	Temperature.Seasonality.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Range Annual Temperature
+
+```{r Range Annual Temperature Regressions & Results, echo = TRUE}
+## Fit the regressions
+Range.Annual.Temperature.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Range_Annual_Temperature"
+	)
+
+## ANOVA
+Range.Annual.Temperature.regression.ANOVAs <- map(
+	Range.Annual.Temperature.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Range.Annual.Temperature.regression.effect.sizes <- map(
+	Range.Annual.Temperature.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Range.Annual.Temperature.regression.predictions <- map(
+	Range.Annual.Temperature.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Annual Precipitation
+
+```{r Annual Precipitation Regressions & Results, echo = TRUE}
+## Fit the regressions
+Annual.Precipitation.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Annual_Precipitation"
+	)
+
+## ANOVA
+Annual.Precipitation.regression.ANOVAs <- map(
+	Annual.Precipitation.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Annual.Precipitation.regression.effect.sizes <- map(
+	Annual.Precipitation.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Annual.Precipitation.regression.predictions <- map(
+	Annual.Precipitation.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Precipitation Seasonality
+
+```{r Precipitation Seasonality Regressions & Results, echo = TRUE}
+## Fit the regressions
+Precipitation.Seasonality.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Precipitation_Seasonality"
+	)
+
+## ANOVA
+Precipitation.Seasonality.regression.ANOVAs <- map(
+	Precipitation.Seasonality.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Precipitation.Seasonality.regression.effect.sizes <- map(
+	Precipitation.Seasonality.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Precipitation.Seasonality.regression.predictions <- map(
+	Precipitation.Seasonality.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+\newpage
+## Aridity Index
+
+```{r Aridity Index Regressions & Results, echo = TRUE}
+## Fit the regressions
+Aridity.Index.regression.list <- map(
+	city.specific.data.list,
+	fit_urbanization_metric_regression,
+	response_variable = "Aridity_Index"
+	)
+
+## ANOVA
+Aridity.Index.regression.ANOVAs <- map(
+	Aridity.Index.regression.list,
+	urbanization_metric_regression_ANOVA
+	)
+
+## Effect sizes
+Aridity.Index.regression.effect.sizes <- map(
+	Aridity.Index.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+## Predictions
+Aridity.Index.regression.predictions <- map(
+	Aridity.Index.regression.list,
+	urbanization_metric_regression_predictions
+	)
+```
+
+
+
+
+
+\newpage
+# Export Data
+
+```{r Export Data for Figures, echo = TRUE}
+## Urbanization metric LMMs
+# GMIS
+write_rds(
+	GMIS.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/GMIS_LMM.rds"
+	)
+# HII
+write_rds(
+	HII.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/HII_LMM.rds"
+	)
+# Mean annual temperature
+write_rds(
+	Mean.Annual.Temperature.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/mean_annual_temperature_LMM.rds"
+	)
+# Temperature seasonality
+write_rds(
+	Temperature.Seasonality.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/temperature_seasonality_LMM.rds"
+	)
+# Range annual temperature
+write_rds(
+	Range.Annual.Temperature.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/range_annual_temperature_LMM.rds"
+	)
+# Annual precipitation
+write_rds(
+	Annual.Precipitation.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/annual_precipitation_LMM.rds"
+	)
+# Precipitation seasonality
+write_rds(
+	Precipitation.Seasonality.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/precipitation_seasonality_LMM.rds"
+	)
+# Aridity index
+write_rds(
+	Aridity.Index.LMM,
+	file = "ESA_2022_subproject/data/analysis_data/aridity_index_LMM.rds"
+	)
+```
+
+
+
+
+
+
+
+
+
+```{r Save the Workspace, include = FALSE}
+## Save the workspace
+save.image("ESA_2022_subproject/data_analysis/10a-Q1_analyses-workspace.RData")
+```
+
+
+# City regression Ps and etas
+
+```{r Dossier so Marc shuts the fuck up}
+# GMIS=====================================================================
+#GMIS.regression.ANOVAs[1] # Distance
+GMIS.P.values <- c(
+	2.775e-13, 2.2e-16, 0.001643, 1.93e-11, 2.2e-16, 5.225e-09,
+	0.00537, 2.2e-16, 2.2e-16, 0.0006998, 4.157e-10, 1.792e-13
+	)
+
+## Effect sizes
+GMIS.regression.effect.sizes <- map_dfr(
+	GMIS.regression.list,
+	urbanization_metric_regression_effect_sizes
+	)
+
+GMIS.eta.squared.distance    <- GMIS.regression.effect.sizes$eta2_Predictor
+GMIS.eta.squared.sample.type <- GMIS.regression.effect.sizes$eta2_Sample_Type
+GMIS.eta.squared.interaction <- GMIS.regression.effect.sizes$eta2_Interaction
+GMIS.R.squared               <- GMIS.regression.effect.sizes$R2_adjusted
+
+# Correlate P and eta for the interaction term
+cor.test(GMIS.P.values, GMIS.eta.squared.interaction)
+
+
+# MAT======================================================================
+#Mean.Annual.Temperature.regression.ANOVAs[1] # Distance
+MAT.P.values <- c(
+	2.2e-16, 0.4641, 0.486972, 0.002361, 0.0002143, 2.031e-13,
+	3.66e-09, 2.2e-16, 0.3270861, 4.805e-12, 2.2e-16, 2.2e-16
+	)
+
+MAT.eta.squared.distance    <- Mean.Annual.Temperature.regression.effect.sizes$eta2_Predictor
+MAT.eta.squared.sample.type <- Mean.Annual.Temperature.regression.effect.sizes$eta2_Sample_Type
+MAT.eta.squared.interaction <- Mean.Annual.Temperature.regression.effect.sizes$eta2_Interaction
+MAT.R.squared               <- Mean.Annual.Temperature.regression.effect.sizes$R2_adjusted
+
+# Correlate P and eta for the interaction term
+cor.test(MAT.P.values, MAT.eta.squared.interaction)
+```
+
+
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```
+
+
+
+

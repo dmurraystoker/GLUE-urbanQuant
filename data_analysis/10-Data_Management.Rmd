@@ -1,0 +1,389 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "ESA 2022 Subproject: Data Management"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+```
+
+
+# Load Data
+
+Description goes here...
+
+
+```{r create_df_list Function, include = FALSE}
+#' Creates a list with dataframes as elements for all csv files in inpath
+#' 
+#' @param inpath Path to directory containing csv files to load
+#' 
+#' @return df_list. List of dataframes, each from a different csv
+create_df_list <- function(inpath){
+  
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+  
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+  
+  return(df_list)
+  
+  }
+```
+
+
+\newpage
+## ESA Data
+
+```{r Load Data: ESA Data, echo = TRUE}
+## Set paths for the ESA data
+ESA.data.path      <- "ESA_2022_subproject/data/sampled_transects/"
+ESA.Distance.path  <- "ESA_2022_subproject/data/Distance_data/GLUE_sites_Distance/"
+ESA.GMIS.path      <- "ESA_2022_subproject/data/GMIS_data/GLUE_sites_GMIS/"
+ESA.HII.path       <- "ESA_2022_subproject/data/HII_data/GLUE_sites_HII"
+#ESA.NDVI.path      <- "ESA_2022_subproject/data/NDVI_data/GLUE_sites_NDVI/"
+ESA.WorldClim.path <- "ESA_2022_subproject/data/WorldClim_data/GLUE_sites_WorldClim/"
+ESA.AI.path        <- "ESA_2022_subproject/data/AI_data/GLUE_sites_AI/"
+
+## Import data for the GLUE sites
+# GLUE sites
+ESA.data.base <- create_df_list(ESA.data.path) %>%
+	bind_rows() %>%
+	select(Country, City, Population, Population_Latitude:Population_Longitude)
+# Distance
+ESA.Distance.data <- create_df_list(ESA.Distance.path) %>%
+	bind_rows() %>%
+	select(UID, Distance)
+# GMIS
+ESA.GMIS.data <- create_df_list(ESA.GMIS.path) %>%
+	bind_rows() %>%
+	select(UID, GMIS_Mean)
+# HII
+ESA.HII.data <- create_df_list(ESA.HII.path) %>%
+	bind_rows() %>%
+	select(UID, HII)
+# NDVI
+#ESA.NDVI.data <- create_df_list(ESA.NDVI.path) %>%
+#	bind_rows() %>%
+#	select(UID, Mean_NDVI, Min_NDVI, Max_NDVI)
+# WorldClim
+ESA.WorldClim.data <- create_df_list(ESA.WorldClim.path) %>%
+	bind_rows() %>%
+	select(-c(Country, City))
+# Aridity Index
+ESA.AI.data <- create_df_list(ESA.AI.path) %>%
+	bind_rows() %>%
+	select(UID, Aridity_Index)
+
+## Add unique identifier for merging data
+ESA.data.base$UID <- paste(ESA.data.base$City, ESA.data.base$Population, sep = ".")
+
+## Merge and organize full ESA data
+ESA.data <- ESA.data.base %>%
+	left_join(ESA.Distance.data, by = "UID") %>%
+	left_join(ESA.GMIS.data, by = "UID") %>%
+	left_join(ESA.HII.data, by = "UID") %>%
+	#left_join(ESA.NDVI.data, by = "UID") %>%
+	left_join(ESA.WorldClim.data, by = "UID") %>%
+	left_join(ESA.AI.data, by = "UID") %>%
+	select(UID, Country, City, Population_Latitude, Population_Longitude,
+				 Distance, GMIS_Mean, HII,
+				 #Mean_NDVI, Min_NDVI, Max_NDVI,
+				 Mean_Annual_Temperature, Temperature_Seasonality, Range_Annual_Temperature,
+				 Annual_Precipitation, Precipitation_Seasonality, Aridity_Index) %>%
+	rename(Latitude = Population_Latitude, Longitude = Population_Longitude)
+
+## Clarify UID for later analyses
+ESA.data$UID <- paste(ESA.data$UID, "GLUE", sep = ".")
+```
+
+
+
+\newpage
+## Random Points
+
+```{r Load Data: Random Points Data, echo = TRUE}
+## Set paths for the random points data
+random.points.data.path      <- "ESA_2022_subproject/data/filtered_random_points/"
+random.points.Distance.path  <- "ESA_2022_subproject/data/Distance_data/random_points_Distance/"
+random.points.GMIS.path      <- "ESA_2022_subproject/data/GMIS_data/random_points_GMIS/"
+random.points.HII.path       <- "ESA_2022_subproject/data/HII_data/random_points_HII/"
+#random.points.NDVI.path      <- "ESA_2022_subproject/data/NDVI_data/random_points_NDVI/"
+random.points.WorldClim.path <- "ESA_2022_subproject/data/WorldClim_data/random_points_WorldClim/"
+random.points.AI.path        <- "ESA_2022_subproject/data/AI_data/random_points_AI/"
+
+## Import data for the random points
+# Random points
+random.points.data.base <- create_df_list(random.points.data.path) %>%
+	bind_rows()
+# Distance
+random.points.Distance.data <- create_df_list(random.points.Distance.path) %>%
+	bind_rows() %>%
+	select(UID, Distance)
+# GMIS
+random.points.GMIS.data <- create_df_list(random.points.GMIS.path) %>%
+	bind_rows() %>%
+	select(UID, GMIS_Mean)
+# HII
+random.points.HII.data <- create_df_list(random.points.HII.path) %>%
+	bind_rows() %>%
+	select(UID, HII)
+# NDVI
+#random.points.NDVI.data <- create_df_list(random.points.NDVI.path) %>%
+#	bind_rows() %>%
+#	select(UID, Mean_NDVI, Min_NDVI, Max_NDVI)
+# WorldClim
+random.points.WorldClim.data <- create_df_list(random.points.WorldClim.path) %>%
+	bind_rows() %>%
+	select(-c(Country, City))
+# Aridity Index
+random.points.AI.data <- create_df_list(random.points.AI.path) %>%
+	bind_rows() %>%
+	select(UID, Aridity_Index)
+
+## Merge and organize full random.points data
+random.points.data <- random.points.data.base %>%
+	left_join(random.points.Distance.data, by = "UID") %>%
+	left_join(random.points.GMIS.data, by = "UID") %>%
+	left_join(random.points.HII.data, by = "UID") %>%
+	#left_join(random.points.NDVI.data, by = "UID") %>%
+	left_join(random.points.WorldClim.data, by = "UID") %>%
+	left_join(random.points.AI.data, by = "UID") %>%
+	select(UID, Country, City, Latitude, Longitude,
+				 Distance, GMIS_Mean, HII,
+				 #Mean_NDVI, Min_NDVI, Max_NDVI,
+				 Mean_Annual_Temperature, Temperature_Seasonality, Range_Annual_Temperature,
+				 Annual_Precipitation, Precipitation_Seasonality, Aridity_Index)
+
+## Clarify UID for later analyses
+random.points.data$UID <- paste(random.points.data$UID, "RP", sep = ".")
+```
+
+
+
+\newpage
+## Systematic Points
+
+```{r Load Data: Systematic Points Data, echo = TRUE}
+## Set paths for the systematic points data
+systematic.points.data.path      <- "ESA_2022_subproject/data/filtered_systematic_points/"
+systematic.points.Distance.path  <- "ESA_2022_subproject/data/Distance_data/systematic_points_Distance/"
+systematic.points.GMIS.path      <- "ESA_2022_subproject/data/GMIS_data/systematic_points_GMIS/"
+systematic.points.HII.path       <- "ESA_2022_subproject/data/HII_data/systematic_points_HII/"
+#systematic.points.NDVI.path      <- "ESA_2022_subproject/data/NDVI_data/systematic_points_NDVI/"
+systematic.points.WorldClim.path <- "ESA_2022_subproject/data/WorldClim_data/systematic_points_WorldClim/"
+systematic.points.AI.path        <- "ESA_2022_subproject/data/AI_data/systematic_points_AI/"
+
+## Import data for the systematic points
+# Systematic points
+systematic.points.data.base <- create_df_list(systematic.points.data.path) %>%
+	bind_rows()
+# Distance
+systematic.points.Distance.data <- create_df_list(systematic.points.Distance.path) %>%
+	bind_rows() %>%
+	select(UID, Distance)
+# GMIS
+systematic.points.GMIS.data <- create_df_list(systematic.points.GMIS.path) %>%
+	bind_rows() %>%
+	select(UID, GMIS_Mean)
+# HII
+systematic.points.HII.data <- create_df_list(systematic.points.HII.path) %>%
+	bind_rows() %>%
+	select(UID, HII)
+# NDVI
+#systematic.points.NDVI.data <- create_df_list(systematic.points.NDVI.path) %>%
+#	bind_rows() %>%
+#	select(UID, Mean_NDVI, Min_NDVI, Max_NDVI)
+# WorldClim
+systematic.points.WorldClim.data <- create_df_list(systematic.points.WorldClim.path) %>%
+	bind_rows() %>%
+	select(-c(Country, City))
+# Aridity Index
+systematic.points.AI.data <- create_df_list(systematic.points.AI.path) %>%
+	bind_rows() %>%
+	select(UID, Aridity_Index)
+
+## Merge and organize full systematic.points data
+systematic.points.data <- systematic.points.data.base %>%
+	left_join(systematic.points.Distance.data, by = "UID") %>%
+	left_join(systematic.points.GMIS.data, by = "UID") %>%
+	left_join(systematic.points.HII.data, by = "UID") %>%
+	#left_join(systematic.points.NDVI.data, by = "UID") %>%
+	left_join(systematic.points.WorldClim.data, by = "UID") %>%
+	left_join(systematic.points.AI.data, by = "UID") %>%
+	select(UID, Country, City, Latitude, Longitude,
+				 Distance, GMIS_Mean, HII,
+				 #Mean_NDVI, Min_NDVI, Max_NDVI,
+				 Mean_Annual_Temperature, Temperature_Seasonality, Range_Annual_Temperature,
+				 Annual_Precipitation, Precipitation_Seasonality, Aridity_Index)
+
+## Clarify UID for later analyses
+systematic.points.data$UID <- paste(systematic.points.data$UID, "SP", sep = ".")
+```
+
+
+
+\newpage
+## Random Transects
+
+```{r Load Data: Random Transects Data, echo = TRUE}
+## Set paths for the random transects data
+random.transects.data.path      <- "ESA_2022_subproject/data/filtered_random_transects/"
+random.transects.Distance.path  <- "ESA_2022_subproject/data/Distance_data/random_transects_Distance/"
+random.transects.GMIS.path      <- "ESA_2022_subproject/data/GMIS_data/random_transects_GMIS/"
+random.transects.HII.path       <- "ESA_2022_subproject/data/HII_data/random_transects_HII/"
+#random.transects.NDVI.path      <- "ESA_2022_subproject/data/NDVI_data/random_transects_NDVI/"
+random.transects.WorldClim.path <- "ESA_2022_subproject/data/WorldClim_data/random_transects_WorldClim/"
+random.transects.AI.path        <- "ESA_2022_subproject/data/AI_data/random_transects_AI/"
+
+## Import data for the random transects
+# Random transects
+random.transects.data.base <- create_df_list(random.transects.data.path) %>%
+	bind_rows()
+# Distance
+random.transects.Distance.data <- create_df_list(random.transects.Distance.path) %>%
+	bind_rows() %>%
+	select(UID, Distance)
+# GMIS
+random.transects.GMIS.data <- create_df_list(random.transects.GMIS.path) %>% 
+	bind_rows() %>%
+	select(UID, GMIS_Mean)
+# HII
+random.transects.HII.data <- create_df_list(random.transects.HII.path) %>%
+	bind_rows() %>%
+	select(UID, HII)
+# NDVI
+#random.transects.NDVI.data <- create_df_list(random.transects.NDVI.path) %>%
+#	bind_rows() %>%
+#	select(UID, Mean_NDVI, Min_NDVI, Max_NDVI)
+# WorldClim
+random.transects.WorldClim.data <- create_df_list(random.transects.WorldClim.path) %>%
+	bind_rows() %>%
+	select(-c(Country, City))
+# Aridity Index
+random.transects.AI.data <- create_df_list(random.transects.AI.path) %>%
+	bind_rows() %>%
+	select(UID, Aridity_Index)
+
+## Merge and organize full random.transects data
+random.transects.data <- random.transects.data.base %>%
+	left_join(random.transects.Distance.data, by = "UID") %>%
+	left_join(random.transects.GMIS.data, by = "UID") %>%
+	left_join(random.transects.HII.data, by = "UID") %>%
+	#left_join(random.transects.NDVI.data, by = "UID") %>%
+	left_join(random.transects.WorldClim.data, by = "UID") %>%
+	left_join(random.transects.AI.data, by = "UID") %>%
+	select(UID, Country, City, Latitude, Longitude,
+				 Distance, GMIS_Mean, HII,
+				 #Mean_NDVI, Min_NDVI, Max_NDVI,
+				 Mean_Annual_Temperature, Temperature_Seasonality, Range_Annual_Temperature,
+				 Annual_Precipitation, Precipitation_Seasonality, Aridity_Index)
+
+## Clarify UID for later analyses
+random.transects.data$UID <- paste(random.transects.data$UID, "RT", sep = ".")
+```
+
+
+
+
+\newpage
+# Manage Data for Analyses
+
+Description goes here...
+
+
+```{r Merge All Data, echo = TRUE}
+## Bind all data
+full.data <- ESA.data %>%
+	bind_rows(random.points.data) %>%
+	bind_rows(systematic.points.data) %>%
+	bind_rows(random.transects.data)
+
+## Set vector of sample type (GLUE, Random_Points, Systematic_Points, Random_Transect)
+full.data$Sample_Type <- c(
+	rep("GLUE", length.out = length(ESA.data$UID)),
+	rep("Random_Points", length.out = length(random.points.data$UID)),
+	rep("Systematic_Points", length.out = length(systematic.points.data$UID)),
+	rep("Random_Transect", length.out = length(random.transects.data$UID))
+	)
+
+## Standardize distance to scale to a maximum of 1
+full.data <- full.data %>%
+	na.omit() %>%
+	group_by(Sample_Type, City) %>%
+	mutate(Standardized_Distance = (Distance/max(Distance)))
+
+## Reorganize the final data
+final.data <- full.data %>%
+	select(UID:City, Sample_Type, Latitude:Longitude, Distance, Standardized_Distance,
+				 GMIS_Mean, HII,
+				 #Mean_NDVI, Min_NDVI, Max_NDVI,
+				 Mean_Annual_Temperature, Temperature_Seasonality, Range_Annual_Temperature,
+				 Annual_Precipitation, Precipitation_Seasonality, Aridity_Index)
+```
+
+
+
+
+\newpage
+# Export Data
+
+Description goes here...
+
+```{r Export Data for Analyses, echo = TRUE}
+## Full data
+write_csv(final.data, file = "ESA_2022_subproject/data/analysis_data/final_data-ESA.csv")
+```
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>% 
+  as.data.frame(.) %>% 
+  filter(attached == TRUE) %>% 
+  dplyr::select(loadedversion, date) %>% 
+  rownames_to_column
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages, 
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+  ) %>%
+	kable_styling(
+		full_width = FALSE,
+  	latex_options = c("HOLD_position", "striped")
+  	) 
+```
+
+
+
+
