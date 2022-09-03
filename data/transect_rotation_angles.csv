@@ -1,0 +1,137 @@
+Continent,Country,City,Minimum_Angle,Maximum_Angle
+North America,USA,Albuquerque,1,180
+Europe,Portugal,Almada,345,359
+Europe,Netherlands,Amsterdam,15,45
+North America,USA,Anchorage,30,45
+Europe,Belgium,Antwerp,15,45
+Oceania,Australia,Armidale,1,359
+North America,USA,Athens,1,359
+North America,USA,Atlanta,1,359
+North America,USA,Atlantic_City,305,310
+North America,USA,Baltimore,1,90
+North America,Canada,Barrie,1,30
+North America,USA,Baton_Rouge,1,140
+Asia,China,Beijing,180,359
+Europe,Germany,Berlin,1,30
+Europe,Switzerland,Bern,270,330
+South America,Colombia,Bogota,1,30
+North America,USA,Boston,260,280
+North America,Canada,Brantford,1,359
+Europe,UK,Brighton,210,359
+Europe,Belgium,Brussels,1,359
+South America,Argentina,Buenos_Aires,1,90
+North America,USA,Burlington,30,45
+North America,Canada,Calgary,1,359
+Europe,UK,Cambridge,1,359
+Oceania,Australia,Canberra,270,359
+Africa,South Africa,Cape_Town,340,359
+North America,USA,Charlotte,135,315
+North America,Canada,Charlottetown,345,359
+North America,USA,Chicago,1,90
+Oceania,New Zealand,Christchurch,1,90
+North America,USA,Cincinnati,1,359
+North America,USA,Cleveland,300,345
+Europe,Germany,Cologne,1,359
+South America,Brazil,Curitiba,285,359
+North America,USA,Denver,1,180
+North America,USA,Detroit,210,225
+North America,Canada,Edmonton,1,359
+North America,USA,Fairbanks,315,359
+North America,Canada,Fergus,1,235
+Europe,Germany,Frankfurt,1,359
+North America,Canada,Fredericton,270,359
+North America,USA,Freehold,90,270
+Europe,Belgium,Ghent,1,135
+Europe,UK,Glasgow,90,180
+North America,Canada,Guelph,1,359
+North America,Canada,Halifax,240,270
+Europe,Germany,Halle,1,359
+Europe,Finland,Helsinki,1,90
+North America,USA,Hempstead,300,359
+Asia,Japan,Hiroshima,350,359
+North America,USA,Houston,300,345
+North America,USA,Indianapolis,1,359
+North America,USA,Jacksonville,1,90
+North America,USA,Kalamazoo,1,359
+Asia,China,Kunming,225,270
+Asia,Japan,Kyoto,60,90
+North America,USA,Lake_Charles,1,135
+Europe,Germany,Landshut,1,225
+North America,USA,Lansing,1,359
+Asia,China,Lanzhou,1,359
+South America,Ecuador,Latacunga,1,30
+Europe,Belgium,Leuven,1,359
+Europe,Sweden,Linkoping,30,75
+Europe,Portugal,Lisbon,345,359
+North America,USA,Little_Rock,1,45
+North America,Canada,London,1,359
+North America,USA,Los_Angeles,345,359
+North America,USA,Louisville,1,359
+North America,USA,Madison,5,10
+Europe,UK,Manchester,1,45
+South America,Colombia,Medellin,165,180
+Oceania,Australia,Melbourne,270,359
+North America,USA,Memphis,1,180
+North America,Mexico,Mexico_City,1,90
+North America,USA,Minneapolis,1,359
+North America,Canada,Moncton,180,359
+North America,Canada,Montreal,285,359
+North America,Mexico,Morelia,315,359
+Europe,Germany,Muenster,1,359
+Europe,Germany,Munich,1,359
+North America,USA,New_Haven,1,75
+North America,USA,New_York,350,359
+Oceania,Australia,Newcastle,345,359
+North America,USA,Norfolk,10,20
+North America,Canada,North_Bay,1,90
+North America,Canada,Orangeville,1,180
+North America,Canada,Ottawa,1,90
+Oceania,New Zealand,Palmerston_North,1,359
+Europe,France,Paris,1,359
+North America,USA,Philadelphia,1,30
+North America,USA,Pittsburgh,1,359
+North America,USA,Portland_ME,1,45
+North America,USA,Portland_OR,315,359
+North America,USA,Providence,1,180
+South America,Chile,Punta_Arenas,1,30
+North America,Canada,Quebec_City,330,359
+South America,Ecuador,Quito,155,165
+North America,USA,Raleigh,1,45
+South America,Chile,Rancagua,150,180
+Europe,UK,Reading,1,359
+Europe,France,Rennes,1,359
+Europe,Germany,Reutlingen,1,180
+North America,USA,Rochester,1,135
+North America,USA,Rockford,1,359
+North America,USA,Sacramento,1,359
+North America,USA,Salem,270,359
+South America,Brazil,Santa_Maria,270,359
+South America,Chile,Santiago,315,359
+Asia,Japan,Sapporo,315,359
+North America,USA,Seattle,210,225
+Asia,China,Shanghai,285,359
+North America,USA,Sioux_Falls,1,359
+North America,USA,St_Louis,1,359
+Europe,Sweden,Stockholm,330,359
+Europe,Germany,Stuttgart,1,359
+North America,Canada,Sudbury,225,359
+Oceania,Australia,Sydney,1,90
+North America,USA,Tacoma,1,45
+South America,Chile,Talca,1,135
+North America,USA,Tampa,300,330
+Asia,Iran,Tehran,270,359
+South America,Chile,Temuco,1,45
+Europe,Greece,Thessaloniki,195,220
+Asia,Japan,Tokyo,1,75
+North America,Mexico,Toluca,90,135
+North America,Canada,Toronto,300,330
+Europe,Norway,Trondheim,330,359
+North America,Canada,Vancouver,5,10
+North America,Canada,Victoria,340,350
+Europe,Poland,Warsaw,1,359
+North America,USA,Washington,1,90
+North America,Canada,Waterloo,1,359
+North America,Canada,Winnipeg,1,359
+Oceania,Australia,Wollongong,5,12.5
+Asia,China,Wuhan,345,359
+Europe,Switzerland,Zurich,1,45
