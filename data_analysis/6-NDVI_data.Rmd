@@ -137,13 +137,13 @@ download_GLUE_transect_NDVI <- function(df, data_out){
 	# Set local site ID (115 measurements/site) for aggregating and later analysis
 	site.ID <- rep(
 		minimum.sites:maximum.sites,
-		each = 115 # Change depending on the start and end dates
+		each = 115
 		)
 	
 	# Organize the downloaded MODIS data
 	NDVI.df <- MODIS.data %>%
-		dplyr::select(site, value) %>%
-		dplyr::rename(City = site, Raw_NDVI = value)
+		select(site, value) %>%
+		rename(City = site, Raw_NDVI = value)
 	
 	# Add site ID to the data
 	NDVI.df$Site_ID <- site.ID
@@ -174,7 +174,8 @@ download_GLUE_transect_NDVI <- function(df, data_out){
 		summarise(Mean_NDVI = mean(Mean_NDVI, na.rm = TRUE),
 							Min_NDVI = mean(Min_NDVI, na.rm = TRUE),
 							Max_NDVI = mean(Max_NDVI, na.rm = TRUE),
-							.groups = "keep")
+							.groups = "keep") %>%
+		ungroup()
 	
 	# Add city to the data
 	NDVI.full.df$City <- city
@@ -187,7 +188,7 @@ download_GLUE_transect_NDVI <- function(df, data_out){
 	
 	# Reorganize the data
 	NDVI.full.df <- NDVI.full.df %>%
-		dplyr::select(UID, Country, City, Mean_NDVI, Min_NDVI, Max_NDVI)
+		select(UID, Country, City, Mean_NDVI, Min_NDVI, Max_NDVI)
 	
 	# Set the outpath for the NDVI data
 	outpath <- paste0(data_out, city, "_NDVI.csv")
@@ -257,13 +258,13 @@ download_points_transects_NDVI <- function(df, data_out){
 	# Set local site ID (115 measurements/site) for aggregating and later analysis
 	site.ID <- rep(
 		minimum.sites:maximum.sites,
-		each = 115 # Change depending on the start and end dates
+		each = 115
 		)
 	
 	# Organize the downloaded MODIS data
 	NDVI.df <- MODIS.data %>%
-		dplyr::select(site, value) %>%
-		dplyr::rename(City = site, Raw_NDVI = value)
+		select(site, value) %>%
+		rename(City = site, Raw_NDVI = value)
 	
 	# Add site ID to the data
 	NDVI.df$Site_ID <- site.ID
@@ -294,7 +295,8 @@ download_points_transects_NDVI <- function(df, data_out){
 		summarise(Mean_NDVI = mean(Mean_NDVI, na.rm = TRUE),
 							Min_NDVI = mean(Min_NDVI, na.rm = TRUE),
 							Max_NDVI = mean(Max_NDVI, na.rm = TRUE),
-							.groups = "keep")
+							.groups = "keep") %>%
+		ungroup()
 	
 	# Add city to the data
 	NDVI.full.df$City <- city
@@ -307,7 +309,7 @@ download_points_transects_NDVI <- function(df, data_out){
 	
 	# Reorganize the data
 	NDVI.full.df <- NDVI.full.df %>%
-		dplyr::select(UID, Country, City, Mean_NDVI, Min_NDVI, Max_NDVI)
+		select(UID, Country, City, Mean_NDVI, Min_NDVI, Max_NDVI)
 	
 	# Set the outpath for the NDVI data
 	outpath <- paste0(data_out, city, "_NDVI.csv")
