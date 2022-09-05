@@ -136,7 +136,7 @@ sample_random_points <- function(df, adjusted_sample_size, data_out){
 	# Set the sampling area
 	sampling.area <- st_buffer(city.center, df$Maximum_Distance*1000)
 
-	# Project the sampling area to generate the operating window (owin)
+	# Project the sampling area to generate the projected operating window
 	sampling.area.projected <- st_transform(
 		sampling.area,
 		crs = 6345
@@ -264,6 +264,18 @@ sample_systematic_points <- function(df, adjusted_sample_size, data_out){
 		bind_cols(systematic.points.unfiltered) %>%
 		filter(Distance < transect.length) %>%
 		rename(Systematic_Point_Longitude = x1, Systematic_Point_Latitude = x2)
+	
+	# Systematic point coordinates
+	#systematic.points.coordinates <- tibble(
+	#	Longitude = systematic.points.working.df$Systematic_Point_Longitude,
+	#	Latitude = systematic.points.working.df$Systematic_Point_Latitude
+	#	)
+	
+	# Check distances between points; want distance > 200 m
+	#systematic.points.pairwise.distance.matrix <- distm(
+	#	x = systematic.points.coordinates,
+	#	fun = distGeo
+	#	)
 	
 	# Add city to the data
 	systematic.points.working.df$City <- city

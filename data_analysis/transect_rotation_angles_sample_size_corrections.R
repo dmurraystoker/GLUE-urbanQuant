@@ -1,6 +1,6 @@
 ## urbanQuant
 
-## Transect Validation
+## Transect Rotation Angles
 
 ## Packages & Data=========================================================
 
@@ -155,23 +155,5 @@ random.transect.map <- get_stamenmap(
 			 y = "Latitude") +
 	theme_pubr()
 random.transect.map
-
-
-
-## Sample Size Corrections=================================================
-
-## Check city name
-GLUE.transect.list[[2]]$City %>% unique()
-
-## Check sample sizes
-# GLUE
-length(GLUE.transect.list[[2]]$Population)
-# Random points
-length(random.points.list[[2]]$UID)
-# Systematic points
-length(systematic.points.list[[2]]$UID)
-# Random transect (check if rotation angle was valid)
-length(random.transects.list[[2]]$UID)
-
 
 
