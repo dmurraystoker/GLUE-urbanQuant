@@ -1,0 +1,308 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Human Influence Index Data"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(raster)
+library(sp)
+```
+
+
+
+
+
+
+
+\newpage
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates a list with dataframes as elements for all csv files in data_in
+#'
+#' @param data_in Path to directory containing csv files to load
+#'
+#' @return df_list List of dataframes, each from a different csv file
+
+## Set the function
+create_df_list <- function(data_in) {
+  # Get all csv files in data_in
+  files <- dir(data_in, pattern = "*.csv")
+
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(data_in, .), show_col_types = FALSE))
+
+  return(df_list)
+}
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transect.data.path <- "data/data_filtered/"
+GLUE.transect.df.list <- create_df_list(GLUE.transect.data.path)
+
+## Load all random transects as a list
+random.transect.data.path <- "data/filtered_random_transects/"
+random.transect.df.list <- create_df_list(random.transect.data.path)
+
+## Load all random points as a list
+random.points.data.path <- "data/filtered_random_points/"
+random.points.df.list <- create_df_list(random.points.data.path)
+
+## Load all systematic points as a list
+systematic.points.data.path <- "data/filtered_systematic_points/"
+systematic.points.df.list <- create_df_list(systematic.points.data.path)
+```
+
+
+
+
+
+
+
+
+\newpage
+# HII Data
+
+Description goes here...
+
+
+
+
+
+
+
+\newpage
+## calculate_GLUE_transect_HII Function
+
+```{r calculate_GLUE_transect_HII Function, echo = TRUE}
+#' Calculates the Human Influence Index (HII) for each site along a GLUE transect. 
+#' HII is calculated at 1-km resolution. Data are exported as a csv file.
+#'
+#' @param df Dataframe with city identifier and lat/long coordinates
+#'   for each site. Coordinates must be in decimal degrees. Separate df for
+#'   each city.
+#' @param raster_path Directory for the HII raster tif file.
+#' @param data_out Directory to export csv files with HII data.
+
+## Set the function
+calculate_GLUE_transect_HII <- function(df, raster_path, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Add fake coordinates for missing data
+  df <- df %>%
+    mutate(
+      Site_Longitude = ifelse(is.na(Site_Longitude), -999, Site_Longitude),
+      Site_Latitude = ifelse(is.na(Site_Latitude), -999, Site_Latitude)
+    )
+
+  # Load in raster for country
+  raster.file <- raster::raster(raster_path)
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf <- SpatialPointsDataFrame(
+    coords = df %>%
+      dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster@crs,
+    data = df
+  )
+
+  # Calculate HII data for population
+  HII_data <- raster::extract(x = raster.file, y = spdf, method = "simple")
+
+  # Add column with HII values
+  df_out <- df %>%
+    mutate(
+      HII = HII_data,
+      HII = ifelse(HII == 255, NA, HII)
+    )
+
+  # Add unique identifier to the data
+  df_out$UID <- paste(df_out$City, rownames(df_out), sep = ".")
+
+  # Reorganize the data
+  df_out <- df_out %>%
+    dplyr::select(UID, Country, City, HII)
+
+  write_csv(df_out, paste0(data_out, city, "_HII.csv"))
+}
+```
+
+
+
+
+
+\newpage
+## calculate_points_transect_HII Function
+
+```{r calculate_points_transects_HII Function, echo = TRUE}
+#' Calculates the Human Influence Index (HII) for each site based on the random
+#' transect, random points, or systematic points sampling designs. HII is calculated
+#' at 1-km resolution. Data are exported as a csv file.
+#'
+#' @param df Dataframe with the city identifier and lat/long coordinates
+#'   for each site. Coordinates must be in decimal degrees. Separate df for
+#'   each city.
+#' @param raster_path Directory for the HII raster tif file.
+#' @param data_out Directory to export csv files with HII data.
+
+## Set the function
+calculate_points_transect_HII <- function(df, raster_path, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Add fake coordinates for missing data
+  df <- df %>%
+    mutate(
+      Longitude = ifelse(is.na(Longitude), -999, Longitude),
+      Latitude = ifelse(is.na(Latitude), -999, Latitude)
+    )
+
+  # Load in raster for country
+  raster.file <- raster::raster(raster_path)
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf <- SpatialPointsDataFrame(
+    coords = df %>%
+      dplyr::select(Longitude, Latitude),
+    proj4string = raster@crs,
+    data = df
+  )
+
+  # Calculate HII data for each population
+  HII_data <- raster::extract(x = raster.file, y = spdf, method = "simple")
+
+  # Add column with HII values
+  df_out <- df %>%
+    mutate(
+      HII = HII_data,
+      HII = ifelse(HII == 255, NA, HII)
+    )
+
+  # Add unique identifier to the data
+  df_out$UID <- paste(df_out$City, rownames(df_out), sep = ".")
+
+  # Reorganize the data
+  df_out <- df_out %>%
+    dplyr::select(UID, Country, City, HII)
+
+  write_csv(df_out, paste0(data_out, city, "_HII.csv"))
+}
+```
+
+
+
+
+
+
+
+\newpage
+# Calculate HII Data
+
+```{r Calculate HII Data, echo = TRUE, results = "hide"}
+## Set raster_path for HII raster dataset
+HII_raster_path <- "raster_files/HII_raster/hii_v2geo/w001001.adf"
+
+
+## Set data_out for HII data
+# GLUE transect
+data_out_1 <- "data/HII_data/GLUE_transects_HII/"
+# Random transect
+data_out_2 <- "data/HII_data/random_transects_HII/"
+# Random points
+data_out_3 <- "data/HII_data/random_points_HII/"
+# Systematic points
+data_out_4 <- "data/HII_data/systematic_points_HII/"
+
+
+## Calculate HII for each site across all sampling types
+# GLUE transects
+purrr::walk(
+  GLUE.transect.df.list,
+  calculate_GLUE_transect_HII,
+  raster_path = HII_raster_path,
+  data_out = data_out_1
+)
+# Random transects
+purrr::walk(
+  random.transect.df.list,
+  calculate_points_transect_HII,
+  raster_path = HII_raster_path,
+  data_out = data_out_2
+)
+# Random points
+purrr::walk(
+  random.points.df.list,
+  calculate_points_transect_HII,
+  raster_path = HII_raster_path,
+  data_out = data_out_3
+)
+# Systematic points
+purrr::walk(
+  systematic.points.df.list,
+  calculate_points_transect_HII,
+  raster_path = HII_raster_path,
+  data_out = data_out_4
+)
+```
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>%
+  as.data.frame(.) %>%
+  filter(attached == TRUE) %>%
+  dplyr::select(loadedversion, date) %>%
+  rownames_to_column()
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages,
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("HOLD_position", "striped")
+  )
+```

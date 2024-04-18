@@ -1,0 +1,480 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "GDP & SSP Data"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(raster)
+```
+
+
+
+
+
+
+
+\newpage
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates list with dataframes as elements for all CSVs in inpath
+#'
+#' @param inpath Path to directory containing CSVs to load
+#'
+#' @return df_list. List of dataframes, each from a different CSV
+create_df_list <- function(inpath) {
+  # Get all csv files in inpath
+  files <- dir(inpath, pattern = "*.csv")
+
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(inpath, .), show_col_types = FALSE))
+
+  return(df_list)
+}
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transect.data.path <- "data/data_filtered/"
+GLUE.transect.df.list <- create_df_list(GLUE.transect.data.path)
+
+## Load all random transects as a list
+random.transect.data.path <- "data/filtered_random_transects/"
+random.transect.df.list <- create_df_list(random.transect.data.path)
+
+## Load all random points as a list
+random.points.data.path <- "data/filtered_random_points/"
+random.points.df.list <- create_df_list(random.points.data.path)
+
+## Load all systematic points as a list
+systematic.points.data.path <- "data/filtered_systematic_points/"
+systematic.points.df.list <- create_df_list(systematic.points.data.path)
+```
+
+
+
+
+
+
+
+\newpage
+# GDP & SSP Data
+
+Description goes here...
+
+
+
+
+
+\newpage
+## calculate_GLUE_transect_GDP_SSP Function
+
+```{r calculate_GLUE_transect_GDP_SSP, echo = TRUE}
+#' Calculates GDP and SSP values for each site along a GLUE transect. GDP and
+#' SSP values are calculated at 1-km resolution. Data are exported as a csv file.
+#'
+#' @param df Dataframe with city and country identifiers and lat/long coordinates
+#'   for each site. Coordinates must be in decimal degrees. Separate df for
+#'   each city.
+#' @param data_out Directory to export csv files with GDP and SSP data.
+
+## Set the function
+calculate_GLUE_transect_GDP_SSP <- function(df, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Get country name
+  country <- df %>%
+    pull(Country) %>%
+    unique()
+
+  # Path for exporting GDP & SSP data
+  data_out <- paste0(data_out, city, "_GDP_SSP.csv")
+
+  # Add fake coordinates for missing data
+  df <- df %>%
+    mutate(
+      Site_Longitude = ifelse(is.na(Site_Longitude), -999, Site_Longitude),
+      Site_Latitude = ifelse(is.na(Site_Latitude), -999, Site_Latitude)
+    )
+
+  ## GDP (2005)------------------------------------------------------------
+  # Load the raster
+  raster_1 <- raster::raster("raster_files/SSP_rasters/GDP2005_1km.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_1 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_1@crs,
+    data = df
+  )
+
+  # Get GDP 2005 for each site
+  GDP_2005 <- raster::extract(x = raster_1, y = spdf_1, method = "simple")
+
+
+  ## SSP1 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_2 <- raster::raster("raster_files/SSP_rasters/GDP_SSP1_1km/GDP2030_ssp1.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_2 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_2@crs,
+    data = df
+  )
+
+  # Get SSP1 2030 for each site
+  SSP_1_2030 <- raster::extract(x = raster_2, y = spdf_2, method = "simple")
+
+
+  ## SSP1 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_3 <- raster::raster("raster_files/SSP_rasters/GDP_SSP1_1km/GDP2100_ssp1.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_3 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_3@crs,
+    data = df
+  )
+
+  # Get SSP1 2100 for each site
+  SSP_1_2100 <- raster::extract(x = raster_3, y = spdf_3, method = "simple")
+
+
+  ## SSP2 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_4 <- raster::raster("raster_files/SSP_rasters/GDP_SSP2_1km/GDP2030_ssp2.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_4 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_4@crs,
+    data = df
+  )
+
+  # Get SSP2 2030 for each site
+  SSP_2_2030 <- raster::extract(x = raster_4, y = spdf_4, method = "simple")
+
+
+  ## SSP2 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_5 <- raster::raster("raster_files/SSP_rasters/GDP_SSP2_1km/GDP2100_ssp2.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_5 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_5@crs,
+    data = df
+  )
+
+  # Get SSP2 2100 for each site
+  SSP_2_2100 <- raster::extract(x = raster_5, y = spdf_5, method = "simple")
+
+
+  ## SSP5 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_6 <- raster::raster("raster_files/SSP_rasters/GDP_SSP5_1km/GDP2030_ssp5.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_6 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_6@crs,
+    data = df
+  )
+
+  # Get SSP5 2030 for each site
+  SSP_5_2030 <- raster::extract(x = raster_6, y = spdf_6, method = "simple")
+
+
+  ## SSP5 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_7 <- raster::raster("raster_files/SSP_rasters/GDP_SSP5_1km/GDP2100_ssp5.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_7 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Site_Longitude, Site_Latitude),
+    proj4string = raster_7@crs,
+    data = df
+  )
+
+  # Get SSP5 2100 for each site
+  SSP_5_2100 <- raster::extract(x = raster_7, y = spdf_7, method = "simple")
+
+
+  ## Data Management-------------------------------------------------------
+
+  # Tibble of extracted GDP and SSP data
+  GDP_SSP_data <- tibble(
+    UID = paste(df$City, rownames(df), sep = "."),
+    Country = country, City = city, GDP_2005,
+    SSP_1_2030, SSP_1_2100, SSP_2_2030, SSP_2_2100, SSP_5_2030, SSP_5_2100
+  )
+
+  write_csv(GDP_SSP_data, file = data_out, col_names = TRUE)
+}
+```
+
+
+
+
+
+\newpage
+## calculate_points_transect_GDP_SSP Function
+
+```{r calculate_points_transect_GDP_SSP Function, echo = TRUE}
+#' Calculates GDP and SSP values for each site based on the random transect,
+#' random points, or systematic points sampling designs. GDP and SSP values
+#' are calculated at 1-km resolution. Data are exported as a csv file.
+#'
+#' @param df Dataframe with city and country identifiers and lat/long coordinates
+#'   for each site. Coordinates must be in decimal degrees. Separate df for
+#'   each city.
+#' @param data_out Directory to export csv files with GDP and SSP data.
+
+## Set the function
+calculate_points_transect_GDP_SSP <- function(df, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Get country name
+  country <- df %>%
+    pull(Country) %>%
+    unique()
+
+  # Path for exporting GDP & SSP data
+  data_out <- paste0(data_out, city, "_GDP_SSP.csv")
+
+  # Add fake coordinates for missing data
+  df <- df %>%
+    mutate(
+      Longitude = ifelse(is.na(Longitude), -999, Longitude),
+      Latitude = ifelse(is.na(Latitude), -999, Latitude)
+    )
+
+  ## GDP (2005)------------------------------------------------------------
+  # Load the raster
+  raster_1 <- raster::raster("raster_files/SSP_rasters/GDP2005_1km.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_1 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_1@crs,
+    data = df
+  )
+
+  # Get GDP 2005 for each site
+  GDP_2005 <- raster::extract(x = raster_1, y = spdf_1, method = "simple")
+
+
+  ## SSP1 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_2 <- raster::raster("raster_files/SSP_rasters/GDP_SSP1_1km/GDP2030_ssp1.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_2 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_2@crs,
+    data = df
+  )
+
+  # Get SSP1 2030 for each site
+  SSP_1_2030 <- raster::extract(x = raster_2, y = spdf_2, method = "simple")
+
+
+  ## SSP1 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_3 <- raster::raster("raster_files/SSP_rasters/GDP_SSP1_1km/GDP2100_ssp1.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_3 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_3@crs,
+    data = df
+  )
+
+  # Get SSP1 2100 for each site
+  SSP_1_2100 <- raster::extract(x = raster_3, y = spdf_3, method = "simple")
+
+
+  ## SSP2 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_4 <- raster::raster("raster_files/SSP_rasters/GDP_SSP2_1km/GDP2030_ssp2.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_4 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_4@crs,
+    data = df
+  )
+
+  # Get SSP2 2030 for each site
+  SSP_2_2030 <- raster::extract(x = raster_4, y = spdf_4, method = "simple")
+
+
+  ## SSP2 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_5 <- raster::raster("raster_files/SSP_rasters/GDP_SSP2_1km/GDP2100_ssp2.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_5 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_5@crs,
+    data = df
+  )
+
+  # Get SSP2 2100 for each site
+  SSP_2_2100 <- raster::extract(x = raster_5, y = spdf_5, method = "simple")
+
+
+  ## SSP5 (2030)------------------------------------------------------------
+  # Load the raster
+  raster_6 <- raster::raster("raster_files/SSP_rasters/GDP_SSP5_1km/GDP2030_ssp5.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_6 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_6@crs,
+    data = df
+  )
+
+  # Get SSP5 2030 for each site
+  SSP_5_2030 <- raster::extract(x = raster_6, y = spdf_6, method = "simple")
+
+
+  ## SSP5 (2100)------------------------------------------------------------
+  # Load the raster
+  raster_7 <- raster::raster("raster_files/SSP_rasters/GDP_SSP5_1km/GDP2100_ssp5.tif")
+
+  # Create spatial point dataframe from latitude and longitude
+  spdf_7 <- SpatialPointsDataFrame(
+    coords = df %>% dplyr::select(Longitude, Latitude),
+    proj4string = raster_7@crs,
+    data = df
+  )
+
+  # Get SSP5 2100 for each site
+  SSP_5_2100 <- raster::extract(x = raster_7, y = spdf_7, method = "simple")
+
+
+  ## Data Management-------------------------------------------------------
+
+  # Tibble of extracted GDP and SSP data
+  GDP_SSP_data <- tibble(
+    UID = paste(df$City, rownames(df), sep = "."),
+    Country = country, City = city, GDP_2005,
+    SSP_1_2030, SSP_1_2100, SSP_2_2030, SSP_2_2100, SSP_5_2030, SSP_5_2100
+  )
+
+  write_csv(GDP_SSP_data, file = data_out, col_names = TRUE)
+}
+```
+
+
+
+
+
+
+
+\newpage
+# Calculate GDP & SSP Data
+
+```{r Calculate GDP & SSP Data, echo = TRUE, results = "hide"}
+## Set data_out for GDP and SSP data
+# GLUE transects
+data_out_1 <- "data/GDP_SSP_data/GLUE_transects_GDP_SSP/"
+# Random transects
+data_out_2 <- "data/GDP_SSP_data/random_transects_GDP_SSP/"
+# Random points
+data_out_3 <- "data/GDP_SSP_data/random_points_GDP_SSP/"
+# Systematic points
+data_out_4 <- "data/GDP_SSP_data/systematic_points_GDP_SSP/"
+
+
+## Calculate GDP and SSP data for each site across all sampling types
+# GLUE transects
+purrr::walk(
+  GLUE.transect.df.list,
+  calculate_GLUE_transect_GDP_SSP,
+  data_out = data_out_1
+)
+# Random transects
+purrr::walk(
+  random.transect.df.list,
+  calculate_points_transects_GDP_SSP,
+  data_out = data_out_2
+)
+# Random points
+purrr::walk(
+  random.points.df.list,
+  calculate_points_transects_GDP_SSP,
+  data_out = data_out_3
+)
+# Systematic points
+purrr::walk(
+  systematic.points.df.list,
+  calculate_points_transects_GDP_SSP,
+  data_out = data_out_4
+)
+```
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>%
+  as.data.frame(.) %>%
+  filter(attached == TRUE) %>%
+  dplyr::select(loadedversion, date) %>%
+  rownames_to_column()
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages,
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("HOLD_position", "striped")
+  )
+```

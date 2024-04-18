@@ -1,0 +1,1035 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Q1: City-Specific Regressions"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for analyses
+library(broom)
+library(car)
+library(easystats)
+library(emmeans)
+```
+
+
+
+
+\newpage
+# Load Data
+
+```{r Load Data, echo = TRUE}
+## Load data
+urban.quantification.full.data <- read_csv(
+  file = "data/analysis_data/urbanQuant-full_data.csv",
+  col_types = c("fffnnninnnnnnininnnnnnn"),
+  show_col_types = FALSE
+)
+
+## Split the data into a list; one dataframe per city
+city.specific.data.list <- urban.quantification.full.data %>%
+  group_split(City) %>%
+  setNames(unique(urban.quantification.full.data$City))
+```
+
+
+
+
+\newpage
+# City-Specific Regressions
+
+
+## Set Functions
+
+```{r fit_environmental_variable_by_distance_model Function, echo = TRUE}
+# Fit a linear model with an environmental variable as the response and distance,
+# sampling design, and the two-way interaction as predictors.
+
+## Set the function
+fit_environmental_variable_by_distance_model <- function(df, response_variable) {
+  # Set the response variable
+  Response_Variable <- df %>% pull(response_variable)
+
+  ## Fit the linear mixed-effects model
+  fitted.regression <- lm(
+    Response_Variable ~ Standardized_Distance + Sampling_Design + Standardized_Distance:Sampling_Design,
+    data = df
+  )
+
+  return(fitted.regression)
+}
+```
+
+\vspace{10pt}
+
+```{r environmental_variable_by_distance_model_ANOVA Function, echo = TRUE}
+# Extract and format the ANOVA table for a fitted environmental
+# variable-by-distance model
+
+## Set the function
+environmental_variable_by_distance_model_ANOVA <- function(fitted_model) {
+  # ANOVA with Type III sums-of-squares
+  regression.anova.table <- Anova(
+    mod = fitted_model,
+    type = "III"
+  )
+
+  # Format the ANOVA table for later data summaries
+  formatted.regression.anova.table <- regression.anova.table %>%
+    rownames_to_column(var = "Term") %>%
+    select("Term", "Pr(>F)") %>%
+    slice(2:4) %>%
+    pivot_wider(names_from = "Term", values_from = "Pr(>F)") %>%
+    rename(
+      Distance = Standardized_Distance,
+      Distance_by_Sampling_Design = `Standardized_Distance:Sampling_Design`
+    ) %>%
+    mutate_at(1:3, round, 5)
+
+  return(formatted.regression.anova.table)
+}
+```
+
+
+\newpage
+```{r environmental_variable_by_distance_model_effect_sizes Function, echo = TRUE}
+# Calculate effect sizes for a fitted environmental variable-by-distance model
+
+## Set the function
+environmental_variable_by_distance_model_effect_sizes <- function(fitted_model) {
+  # Get the adjusted R-squared
+  regression.R.squared <- summary(fitted_model)$adj.r.squared
+
+  # Effect sizes for the fixed effects
+  regression.eta.squared <- eta_squared(fitted_model, partial = TRUE, ci = 0.95)
+
+  # Combine the effect sizes into a summary table
+  regression.effect.size.summary.table <- tibble(
+    R2_adjusted = regression.R.squared,
+    eta2_Predictor = regression.eta.squared[1, 2],
+    eta2_Sampling_Design = regression.eta.squared[2, 2],
+    eta2_Interaction = regression.eta.squared[3, 2]
+  )
+
+  return(regression.effect.size.summary.table)
+}
+```
+
+\vspace{10pt}
+
+```{r deviation_regression_predictions Function, echo = TRUE}
+# Extract and format predictions (i.e., slopes) for a fitted environmental
+# variable-by-distance model.
+
+## Set the function
+environmental_variable_by_distance_model_predictions <- function(fitted_model) {
+  # Get the predictions from the fitted regression
+  regression.predictions <- emtrends(
+    fitted_model,
+    specs = pairwise ~ Sampling_Design,
+    var = "Standardized_Distance",
+    weights = "cells",
+    adjust = "none"
+  )
+
+  # Format the model predictions for later data summaries and figures
+  formatted.regression.predictions <- regression.predictions$emtrends %>%
+    as_tibble() %>%
+    rename(Estimated_Slope = Standardized_Distance.trend) %>%
+    select(Sampling_Design:SE)
+
+
+  return(formatted.regression.predictions)
+}
+```
+
+
+\newpage
+## ISC
+
+```{r ISC Regressions & Results, echo = TRUE}
+## Fit the regressions
+ISC.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "ISC_Mean"
+)
+
+## ANOVA
+ISC.regression.ANOVAs <- map_dfr(
+  ISC.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+ISC.regression.effect.sizes <- map_dfr(
+  ISC.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+ISC.regression.predictions <- map_dfr(
+  ISC.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## HII
+
+```{r HII Regressions & Results, echo = TRUE}
+## Fit the regressions
+HII.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "HII"
+)
+
+## ANOVA
+HII.regression.ANOVAs <- map_dfr(
+  HII.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+HII.regression.effect.sizes <- map_dfr(
+  HII.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+HII.regression.predictions <- map_dfr(
+  HII.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Mean NDVI
+
+```{r Mean NDVI Regressions & Results, echo = TRUE}
+## Fit the regressions
+mean.NDVI.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Mean_NDVI"
+)
+
+## ANOVA
+mean.NDVI.regression.ANOVAs <- map_dfr(
+  mean.NDVI.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+mean.NDVI.regression.effect.sizes <- map_dfr(
+  mean.NDVI.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+mean.NDVI.regression.predictions <- map_dfr(
+  mean.NDVI.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Min NDVI
+
+```{r Min NDVI Regressions & Results, echo = TRUE, eval = FALSE}
+## Fit the regressions
+min.NDVI.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Min_NDVI"
+)
+
+## ANOVA
+min.NDVI.regression.ANOVAs <- map_dfr(
+  min.NDVI.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+min.NDVI.regression.effect.sizes <- map_dfr(
+  min.NDVI.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+min.NDVI.regression.predictions <- map_dfr(
+  min.NDVI.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Max NDVI
+
+```{r Max NDVI Regressions & Results, echo = TRUE, eval = FALSE}
+## Fit the regressions
+max.NDVI.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Max_NDVI"
+)
+
+## ANOVA
+max.NDVI.regression.ANOVAs <- map_dfr(
+  max.NDVI.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+max.NDVI.regression.effect.sizes <- map_dfr(
+  max.NDVI.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+max.NDVI.regression.predictions <- map_dfr(
+  max.NDVI.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Mean Annual Temperature
+
+```{r Mean Annual Temperature Regressions & Results, echo = TRUE}
+## Fit the regressions
+mean.annual.temperature.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Mean_Annual_Temperature"
+)
+
+## ANOVA
+mean.annual.temperature.regression.ANOVAs <- map_dfr(
+  mean.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+mean.annual.temperature.regression.effect.sizes <- map_dfr(
+  mean.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+mean.annual.temperature.regression.predictions <- map_dfr(
+  mean.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Temperature Seasonality
+
+```{r Temperature Seasonality Regressions & Results, echo = TRUE}
+## Fit the regressions
+temperature.seasonality.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Temperature_Seasonality"
+)
+
+## ANOVA
+temperature.seasonality.regression.ANOVAs <- map_dfr(
+  temperature.seasonality.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+temperature.seasonality.regression.effect.sizes <- map_dfr(
+  temperature.seasonality.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+temperature.seasonality.regression.predictions <- map_dfr(
+  temperature.seasonality.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Range Annual Temperature
+
+```{r Range Annual Temperature Regressions & Results, echo = TRUE}
+## Fit the regressions
+range.annual.temperature.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Range_Annual_Temperature"
+)
+
+## ANOVA
+range.annual.temperature.regression.ANOVAs <- map_dfr(
+  range.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+range.annual.temperature.regression.effect.sizes <- map_dfr(
+  range.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+range.annual.temperature.regression.predictions <- map_dfr(
+  range.annual.temperature.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Annual Precipitation
+
+```{r Annual Precipitation Regressions & Results, echo = TRUE}
+## Fit the regressions
+annual.precipitation.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Annual_Precipitation"
+)
+
+## ANOVA
+annual.precipitation.regression.ANOVAs <- map_dfr(
+  annual.precipitation.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+annual.precipitation.regression.effect.sizes <- map_dfr(
+  annual.precipitation.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+annual.precipitation.regression.predictions <- map_dfr(
+  annual.precipitation.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Precipitation Seasonality
+
+```{r Precipitation Seasonality Regressions & Results, echo = TRUE}
+## Fit the regressions
+precipitation.seasonality.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Precipitation_Seasonality"
+)
+
+## ANOVA
+precipitation.seasonality.regression.ANOVAs <- map_dfr(
+  precipitation.seasonality.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+precipitation.seasonality.regression.effect.sizes <- map_dfr(
+  precipitation.seasonality.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+precipitation.seasonality.regression.predictions <- map_dfr(
+  precipitation.seasonality.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## Aridity Index
+
+```{r Aridity Index Regressions & Results, echo = TRUE}
+## Fit the regressions
+aridity.index.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "Aridity_Index"
+)
+
+## ANOVA
+aridity.index.regression.ANOVAs <- map_dfr(
+  aridity.index.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+aridity.index.regression.effect.sizes <- map_dfr(
+  aridity.index.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+aridity.index.regression.predictions <- map_dfr(
+  aridity.index.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(
+    City = c(
+      rep(names(city.specific.data.list[1:135]), each = 4), rep(names(city.specific.data.list[136]), each = 3)
+    )
+  )
+```
+
+
+\newpage
+## GDP 2005
+
+```{r GDP 2005 Regressions & Results, echo = TRUE}
+## Fit the regressions
+GDP.2005.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "GDP_2005"
+)
+
+## ANOVA
+GDP.2005.regression.ANOVAs <- map_dfr(
+  GDP.2005.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+GDP.2005.regression.effect.sizes <- map_dfr(
+  GDP.2005.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+GDP.2005.regression.predictions <- map_dfr(
+  GDP.2005.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP1 2030
+
+```{r SSP1 2030 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP1.2030.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_1_2030"
+)
+
+## ANOVA
+SSP1.2030.regression.ANOVAs <- map_dfr(
+  SSP1.2030.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP1.2030.regression.effect.sizes <- map_dfr(
+  SSP1.2030.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP1.2030.regression.predictions <- map_dfr(
+  SSP1.2030.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP1 2100
+
+```{r SSP1 2100 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP1.2100.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_1_2100"
+)
+
+## ANOVA
+SSP1.2100.regression.ANOVAs <- map_dfr(
+  SSP1.2100.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP1.2100.regression.effect.sizes <- map_dfr(
+  SSP1.2100.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP1.2100.regression.predictions <- map_dfr(
+  SSP1.2100.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP2 2030
+
+```{r SSP2 2030 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP2.2030.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_2_2030"
+)
+
+## ANOVA
+SSP2.2030.regression.ANOVAs <- map_dfr(
+  SSP2.2030.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP2.2030.regression.effect.sizes <- map_dfr(
+  SSP2.2030.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP2.2030.regression.predictions <- map_dfr(
+  SSP2.2030.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP2 2100
+
+```{r SSP2 2100 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP2.2100.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_2_2100"
+)
+
+## ANOVA
+SSP2.2100.regression.ANOVAs <- map_dfr(
+  SSP2.2100.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP2.2100.regression.effect.sizes <- map_dfr(
+  SSP2.2100.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP2.2100.regression.predictions <- map_dfr(
+  SSP2.2100.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP5 2030
+
+```{r SSP5 2030 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP5.2030.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_5_2030"
+)
+
+## ANOVA
+SSP5.2030.regression.ANOVAs <- map_dfr(
+  SSP5.2030.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP5.2030.regression.effect.sizes <- map_dfr(
+  SSP5.2030.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP5.2030.regression.predictions <- map_dfr(
+  SSP5.2030.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+\newpage
+## SSP5 2100
+
+```{r SSP5 2100 Regressions & Results, echo = TRUE}
+## Fit the regressions
+SSP5.2100.regression.list <- map(
+  city.specific.data.list,
+  fit_environmental_variable_by_distance_model,
+  response_variable = "SSP_5_2100"
+)
+
+## ANOVA
+SSP5.2100.regression.ANOVAs <- map_dfr(
+  SSP5.2100.regression.list,
+  environmental_variable_by_distance_model_ANOVA
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Effect sizes
+SSP5.2100.regression.effect.sizes <- map_dfr(
+  SSP5.2100.regression.list,
+  environmental_variable_by_distance_model_effect_sizes
+) %>%
+  add_column(City = names(city.specific.data.list))
+
+## Predictions
+SSP5.2100.regression.predictions <- map_dfr(
+  SSP5.2100.regression.list,
+  environmental_variable_by_distance_model_predictions
+) %>%
+  add_column(City = rep(names(city.specific.data.list), each = 4))
+```
+
+
+
+
+\newpage
+# Summaries
+
+## Data Management
+
+```{r Results Summary: Data Management, echo = TRUE}
+## Combine all ANOVA tables
+combined.ANOVA.table <- bind_rows(
+  ISC.regression.ANOVAs, HII.regression.ANOVAs, mean.NDVI.regression.ANOVAs,
+  mean.annual.temperature.regression.ANOVAs, temperature.seasonality.regression.ANOVAs,
+  range.annual.temperature.regression.ANOVAs, annual.precipitation.regression.ANOVAs,
+  precipitation.seasonality.regression.ANOVAs, aridity.index.regression.ANOVAs,
+  GDP.2005.regression.ANOVAs, SSP1.2030.regression.ANOVAs,
+  SSP1.2100.regression.ANOVAs, SSP2.2030.regression.ANOVAs,
+  SSP2.2100.regression.ANOVAs, SSP5.2030.regression.ANOVAs,
+  SSP5.2100.regression.ANOVAs
+) %>%
+  add_column(
+    urban_environmental_variable = rep(
+      c(
+        "ISC", "HII", "Mean_NDVI", "Mean_Annual_Temperature",
+        "Temperature_Seasonality", "Range_Annual_Temperature",
+        "Annual_Precipitation", "Precipitation_Seasonality",
+        "Aridity_Index", "GDP_2005", "SSP_1_2030", "SSP_1_2100",
+        "SSP_2_2030", "SSP_2_2100", "SSP_5_2030", "SSP_5_2100"
+      ),
+      each = 136
+    )
+  )
+
+## Combine all effect size tables
+combined.effect.size.table <- bind_rows(
+  ISC.regression.effect.sizes, HII.regression.effect.sizes, mean.NDVI.regression.effect.sizes,
+  mean.annual.temperature.regression.effect.sizes, temperature.seasonality.regression.effect.sizes,
+  range.annual.temperature.regression.effect.sizes, annual.precipitation.regression.effect.sizes,
+  precipitation.seasonality.regression.effect.sizes, aridity.index.regression.effect.sizes,
+  GDP.2005.regression.effect.sizes, SSP1.2030.regression.effect.sizes,
+  SSP1.2100.regression.effect.sizes, SSP2.2030.regression.effect.sizes,
+  SSP2.2100.regression.effect.sizes, SSP5.2030.regression.effect.sizes,
+  SSP5.2100.regression.effect.sizes
+) %>%
+  add_column(
+    urban_environmental_variable = rep(
+      c(
+        "ISC", "HII", "Mean_NDVI", "Mean_Annual_Temperature",
+        "Temperature_Seasonality", "Range_Annual_Temperature",
+        "Annual_Precipitation", "Precipitation_Seasonality",
+        "Aridity_Index", "GDP_2005", "SSP_1_2030", "SSP_1_2100",
+        "SSP_2_2030", "SSP_2_2100", "SSP_5_2030", "SSP_5_2100"
+      ),
+      each = 136
+    )
+  )
+
+## Combine ANOVA and effect size tables
+full.regression.results <- combined.ANOVA.table %>%
+  full_join(combined.effect.size.table, by = c("City", "urban_environmental_variable")) %>%
+  select(
+    City, urban_environmental_variable, Distance:Distance_by_Sampling_Design,
+    eta2_Predictor:eta2_Interaction, R2_adjusted
+  )
+```
+
+
+\newpage
+## Summary Tables
+
+```{r Summary Table: Distance Term Tally, echo = FALSE}
+distance.term.tally <- full.regression.results %>%
+  select(urban_environmental_variable, Distance) %>%
+  group_by(urban_environmental_variable) %>%
+  summarise(
+    "P < 0.001" = (sum(Distance < 0.001) / 136) * 100,
+    "P < 0.025" = (sum(Distance < 0.025) / 136) * 100,
+    "P < 0.050" = (sum(Distance < 0.050) / 136) * 100,
+    "P < 0.100" = (sum(Distance < 0.100) / 136) * 100,
+    "P < 0.250" = (sum(Distance < 0.250) / 136) * 100
+  )
+
+kable(
+  distance.term.tally,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Percent of models with P-values below specific thresholds for the distance term. Total number of models = 136.",
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Summary Table: Sample Type Term Tally, echo = FALSE}
+sample.type.tally <- full.regression.results %>%
+  select(urban_environmental_variable, Sampling_Design) %>%
+  group_by(urban_environmental_variable) %>%
+  summarise(
+    "P < 0.001" = (sum(Sampling_Design < 0.001) / 136) * 100,
+    "P < 0.025" = (sum(Sampling_Design < 0.025) / 136) * 100,
+    "P < 0.050" = (sum(Sampling_Design < 0.050) / 136) * 100,
+    "P < 0.100" = (sum(Sampling_Design < 0.100) / 136) * 100,
+    "P < 0.250" = (sum(Sampling_Design < 0.250) / 136) * 100
+  )
+
+kable(
+  sample.type.tally,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Percent of models with P-values below specific thresholds for the sample type term. Total number of models = 136.",
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Summary Table: Interaction Term Tally, echo = FALSE}
+interaction.term.tally <- full.regression.results %>%
+  select(urban_environmental_variable, Distance_by_Sampling_Design) %>%
+  group_by(urban_environmental_variable) %>%
+  summarise(
+    "P < 0.001" = (sum(Distance_by_Sampling_Design < 0.001) / 136) * 100,
+    "P < 0.025" = (sum(Distance_by_Sampling_Design < 0.025) / 136) * 100,
+    "P < 0.050" = (sum(Distance_by_Sampling_Design < 0.050) / 136) * 100,
+    "P < 0.100" = (sum(Distance_by_Sampling_Design < 0.100) / 136) * 100,
+    "P < 0.250" = (sum(Distance_by_Sampling_Design < 0.250) / 136) * 100
+  )
+
+kable(
+  interaction.term.tally,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Percent of models with P-values below specific thresholds for the distance-by-sample-type interaction term. Total number of models = 136.",
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+
+```{r Summary Table: P-Values, echo = FALSE}
+## Calculate summary statistics for the P-values
+P.value.summary.table <- full.regression.results %>%
+  select(urban_environmental_variable:Distance_by_Sampling_Design) %>%
+  group_by(urban_environmental_variable) %>%
+  summarise(
+    Distance_P_Value_Mean = mean(Distance),
+    Sampling_Design_P_Value_Mean = mean(Sampling_Design),
+    Interaction_P_Value_Mean = mean(Distance_by_Sampling_Design),
+    Distance_P_Value_SE = sd(Distance) / sqrt(136),
+    Sampling_Design_P_Value_SE = sd(Sampling_Design) / sqrt(136),
+    Interaction_P_Value_SE = sd(Distance_by_Sampling_Design) / sqrt(136),
+    Distance_P_Value_Min = min(Distance),
+    Sampling_Design_P_Value_Min = min(Sampling_Design),
+    Interaction_P_Value_Min = min(Distance_by_Sampling_Design),
+    Distance_P_Value_Max = max(Distance),
+    Sampling_Design_P_Value_Max = max(Sampling_Design),
+    Interaction_P_Value_Max = max(Distance_by_Sampling_Design)
+  )
+
+kable(
+  P.value.summary.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the P-values for the city-specific regressions for each urbanization metric.",
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down")) %>%
+  landscape()
+```
+
+\newpage
+
+```{r Summary Table: Effect Sizes, echo = FALSE}
+## Calculate summary statistics for the effect sizes
+effect.size.summary.table <- full.regression.results %>%
+  select(urban_environmental_variable:eta2_Interaction) %>%
+  group_by(urban_environmental_variable) %>%
+  summarise(
+    Distance_Effect_Size_Mean = mean(eta2_Predictor),
+    Sampling_Design_Effect_Size_Mean = mean(eta2_Sampling_Design),
+    Interaction_Effect_Size_Mean = mean(eta2_Interaction),
+    Distance_Effect_Size_SE = sd(eta2_Predictor) / sqrt(136),
+    Sampling_Design_Effect_Size_SE = sd(eta2_Sampling_Design) / sqrt(136),
+    Interaction_Effect_Size_SE = sd(eta2_Interaction) / sqrt(136),
+    Distance_Effect_Size_Min = min(eta2_Predictor),
+    Sampling_Design_Effect_Size_Min = min(eta2_Sampling_Design),
+    Interaction_Effect_Size_Min = min(eta2_Interaction),
+    Distance_Effect_Size_Max = max(eta2_Predictor),
+    Sampling_Design_Effect_Size_Max = max(eta2_Sampling_Design),
+    Interaction_Effect_Size_Max = max(eta2_Interaction)
+  )
+
+kable(
+  effect.size.summary.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the effect sizes (eta-squared) for the city-specific regressions for each urbanization metric.",
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down")) %>%
+  landscape()
+```
+
+
+
+
+\newpage
+# Export the Results
+
+```{r Export Results: ANOVAs & Effect Sizes, echo = TRUE}
+## Combined ANOVA and effect size tables
+write_csv(
+  full.regression.results,
+  "data/analysis_data/city_specific_regressions/full_regression_results.csv"
+)
+```
+
+```{r Save the Workspace, include = FALSE}
+## Save the workspace
+save.image("data_analysis/3-analyses/3-city_specific_regressions-workspace.RData")
+```
+
+
+
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>%
+  as.data.frame(.) %>%
+  filter(attached == TRUE) %>%
+  dplyr::select(loadedversion, date) %>%
+  rownames_to_column()
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages,
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("HOLD_position", "striped")
+  )
+```

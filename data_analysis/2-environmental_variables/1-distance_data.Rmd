@@ -1,0 +1,324 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Distance Data"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for data extraction and management
+library(geosphere)
+```
+
+
+
+
+
+
+
+\newpage
+# Load Data
+
+```{r create_df_list Function, echo = TRUE}
+#' Creates a list with dataframes as elements for all csv files in data_in
+#'
+#' @param data_in Path to directory containing csv files to load
+#'
+#' @return df_list List of dataframes, each from a different csv file
+
+## Set the function
+create_df_list <- function(data_in) {
+  # Get all csv files in data_in
+  files <- dir(data_in, pattern = "*.csv")
+
+  # Read in all the files, appending the path before the filename
+  df_list <- files %>%
+    map(~ read_csv(file.path(data_in, .), show_col_types = FALSE))
+
+  return(df_list)
+}
+```
+
+\vspace{10pt}
+
+```{r Create Lists of Dataframes, echo = TRUE}
+## Load all GLUE transects as a list
+GLUE.transect.data.path <- "data/data_filtered/"
+GLUE.transect.df.list <- create_df_list(GLUE.transect.data.path)
+
+## Load all random transects as a list
+random.transect.data.path <- "data/filtered_random_transects/"
+random.transect.df.list <- create_df_list(random.transect.data.path)
+
+# Load all random points as a list
+random.points.data.path <- "data/filtered_random_points/"
+random.points.df.list <- create_df_list(random.points.data.path)
+
+## Load all systematic points as a list
+systematic.points.data.path <- "data/filtered_systematic_points/"
+systematic.points.df.list <- create_df_list(systematic.points.data.path)
+```
+
+\vspace{10pt}
+
+```{r City Information Data, echo = TRUE}
+## Load city information data
+city.information.data <- read_csv(
+  "data/full_city_information.csv",
+  show_col_types = FALSE
+)
+```
+
+
+
+
+
+\newpage
+# Distance from the City Center
+
+Description goes here...
+
+
+
+
+
+\newpage
+## calculate_GLUE_site_distance Function
+
+```{r calculate_GLUE_site_distance Function, echo = TRUE}
+#' Calculates distance from the city center for each site along the GLUE transect.
+#' Data are exported as a csv file.
+#'
+#' @param df Dataframe with filtered sites and associated lat/long coordinates.
+#'   Coordinates must be in decimal degrees.
+#' @param data_out Path to export csv files after calculating distance from the
+#'   city center for each site.
+
+## Set the function
+calculate_GLUE_site_distance <- function(df, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Get country name
+  country <- df %>%
+    pull(Country) %>%
+    unique()
+
+  # Set the site coordinates
+  site.coordinates <- tibble(
+    Longitude = df$Site_Longitude,
+    Latitude = df$Site_Latitude
+  )
+
+  # Set coordinates of the city center
+  # Longitude
+  city.center.longitude <- df$City_Longitude %>% unique()
+  # Latitude
+  city.center.latitude <- df$City_Latitude %>% unique()
+
+  # Calculate distance to the city center for each site
+  distance.df <- distGeo(
+    p1 = site.coordinates,
+    p2 = c(city.center.longitude, city.center.latitude)
+  ) %>%
+    as_tibble() %>%
+    mutate(Distance = value / 1000)
+
+  # Add city to the data
+  distance.df$City <- city
+
+  # Add country to the data
+  distance.df$Country <- country
+
+  # Add a unique identifier to the data
+  distance.df$UID <- paste(distance.df$City, rownames(distance.df), sep = ".")
+
+  # Reorganize the data
+  distance.df <- distance.df %>%
+    select(UID, Country, City, Distance)
+
+  # Set the outpath for the distance data
+  outpath <- paste0(data_out, city, "_distance.csv")
+
+  # Export the filtered dataframe
+  write_csv(distance.df, file = outpath, col_names = TRUE)
+}
+```
+
+
+
+
+
+\newpage
+## calculate_points_transect_distance Function
+
+```{r calculate_points_transect_distance Function, echo = TRUE}
+#' Calculates distance from the city center for each site for the random points,
+#'  systematic points, or random transect sampling designs. Data are exported as a csv file.
+#'
+#' @param df Dataframe with filtered sites and associated lat/long coordinates.
+#'   Coordinates must be in decimal degrees.
+#' @param city_centers Dataframe with lat/long coordinates for the city center.
+#' @param data_out Path to export csv files after calculating distance from the
+#'   city center for each site.
+
+## Set the function
+calculate_points_transect_distance <- function(df, city_centers, data_out) {
+  # Get city name
+  city <- df %>%
+    pull(City) %>%
+    unique()
+
+  # Get country name
+  country <- df %>%
+    pull(Country) %>%
+    unique()
+
+  # Set the site coordinates
+  site.coordinates <- tibble(
+    Longitude = df$Longitude,
+    Latitude = df$Latitude
+  )
+
+  # Set coordinates of the city center
+  # Longitude
+  city.center.longitude <- city_centers %>%
+    filter(City == city) %>%
+    select(City_Longitude) %>%
+    unique() %>%
+    as.numeric()
+  # Latitude
+  city.center.latitude <- city_centers %>%
+    filter(City == city) %>%
+    select(City_Latitude) %>%
+    unique() %>%
+    as.numeric()
+
+  # Calculate distance to the city center for each site
+  distance.df <- distGeo(
+    p1 = site.coordinates,
+    p2 = c(city.center.longitude, city.center.latitude)
+  ) %>%
+    as_tibble() %>%
+    mutate(Distance = value / 1000)
+
+  # Add city to the data
+  distance.df$City <- city
+
+  # Add country to the data
+  distance.df$Country <- country
+
+  # Add a unique identifier to the data
+  distance.df$UID <- paste(distance.df$City, rownames(distance.df), sep = ".")
+
+  # Reorganize the data
+  distance.df <- distance.df %>%
+    select(UID, Country, City, Distance)
+
+  # Set the outpath for the distance data
+  outpath <- paste0(data_out, city, "_distance.csv")
+
+  # Export the filtered dataframe
+  write_csv(distance.df, file = outpath, col_names = TRUE)
+}
+```
+
+
+
+
+
+\newpage
+## Calculate Distance Data
+
+```{r Calculate Distance Data, echo = TRUE, message = FALSE, error = FALSE, results = "hide"}
+## Set data_out for distance data
+# GLUE transect
+data_out_1 <- "data/distance_data/GLUE_transects_distance/"
+# Random transect
+data_out_2 <- "data/distance_data/random_transects_distance/"
+# Random points
+data_out_3 <- "data/distance_data/random_points_distance/"
+# Systematic points
+data_out_4 <- "data/distance_data/systematic_points_distance/"
+
+## Calculate distance data
+# GLUE transects
+purrr::walk(
+  GLUE.transect.df.list,
+  calculate_GLUE_site_distance,
+  data_out = data_out_1
+)
+# Random transects
+purrr::walk(
+  random.transect.df.list,
+  calculate_points_transect_distance,
+  city_centers = city.information.data,
+  data_out = data_out_2
+)
+# Random points
+purrr::walk(
+  random.points.df.list,
+  calculate_points_transect_distance,
+  city_centers = city.information.data,
+  data_out = data_out_3
+)
+# Systematic points
+purrr::walk(
+  systematic.points.df.list,
+  calculate_points_transect_distance,
+  city_centers = city.information.data,
+  data_out = data_out_4
+)
+```
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>%
+  as.data.frame(.) %>%
+  dplyr::filter(attached == TRUE) %>%
+  dplyr::select(loadedversion, date) %>%
+  rownames_to_column()
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages,
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("HOLD_position", "striped")
+  )
+```

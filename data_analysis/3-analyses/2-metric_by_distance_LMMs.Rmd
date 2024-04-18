@@ -1,0 +1,4263 @@
+---
+title: "GLUE-urbanQuant"
+subtitle: "Environmental Variable-By-Distance LMMs"
+author: "David Murray-Stoker"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    fig_caption: yes
+    latex_engine: xelatex
+always_allow_html: true
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(results = "hold", fig.pos = "H", fig.align = "center", out.width = "92.5%")
+options(knitr.graphics.error = FALSE)
+kableExtra::usepackage_latex("float")
+```
+
+```{r Load Packages for R Markdown, include = FALSE}
+library(kableExtra)
+library(knitr)
+```
+
+```{r Load Packages & Data, include = FALSE}
+## Load the tidyverse
+library(tidyverse)
+
+## Packages for analyses
+library(broom)
+library(car)
+library(easystats)
+library(emmeans)
+library(lme4)
+library(lmerTest)
+library(vegan)
+```
+
+
+
+
+
+
+
+\newpage
+# Load Data
+
+```{r Load Data, echo = TRUE}
+## Load data
+urban.quantification.full.data <- read_csv(
+  file = "data/analysis_data/urbanQuant-full_data.csv",
+  col_types = c("fffnnninnnnnnininnnnnnn"),
+  show_col_types = FALSE
+)
+```
+
+```{r include = FALSE}
+## Load the workspace
+load("data_analysis/3-analyses/2-metric_by_distance-workspace.RData")
+```
+
+
+
+
+
+\newpage
+# Linear Mixed-Effects Models
+
+
+## ISC
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: ISC LMM, echo = TRUE}
+ISC.LMM <- lmer(
+  ISC_Mean ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: ISC LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(ISC.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(ISC.LMM)
+# No singularity
+
+## Visual assessment
+check_model(ISC.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(ISC.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(ISC.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P = 0.008)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P = 0.005)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(ISC.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(ISC.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: ISC LMM, echo = TRUE}
+ISC.LMM.emmeans <- emmeans(
+  ISC.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: ISC LMM, echo = FALSE}
+kable(
+  tidy(ISC.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the ISC LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: ISC LMM, echo = FALSE}
+kable(
+  eff_size(
+  	ISC.LMM.emmeans,
+    sigma = sigma(ISC.LMM),
+    edf = df.residual(ISC.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the ISC LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r ISC LMM: Model Predictions, echo = TRUE}
+ISC.LMM.emtrends <- emtrends(
+	ISC.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r ISC LMM: Model Predictions Table, echo = FALSE}
+kable(
+  ISC.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in ISC from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the ISC linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r ISC LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(ISC.LMM)
+# Marginal = 0.400
+# Conditional = 0.635
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r ISC LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+ISC.LMM.anova.table <- anova(
+  object = ISC.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r ISC LMM: ANOVA Table, echo = FALSE}
+kable(
+  ISC.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the ISC linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r ISC LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(ISC.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the ISC linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r ISC LMM: ranova, echo = TRUE}
+## Fit a ranova
+ISC.LMM.ranova <- ranova(
+  ISC.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r ISC LMM: ranova Table, echo = FALSE}
+kable(
+  ISC.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the ISC linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r ISC LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(ISC.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the ISC linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+
+
+
+
+
+
+\newpage
+## HII
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: HII LMM, echo = TRUE}
+HII.LMM <- lmer(
+  HII ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: HII LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(HII.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(HII.LMM)
+# No singularity
+
+## Visual assessment
+check_model(HII.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(HII.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(HII.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P = 0.021)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P = 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.147)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(HII.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(HII.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: HII LMM, echo = TRUE}
+HII.LMM.emmeans <- emmeans(
+  HII.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: HII LMM, echo = FALSE}
+kable(
+  tidy(HII.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the HII LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: HII LMM, echo = FALSE}
+kable(
+  eff_size(
+  	HII.LMM.emmeans,
+    sigma = sigma(HII.LMM),
+    edf = df.residual(HII.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the HII LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r HII LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+HII.LMM.emtrends <- emtrends(
+	HII.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r HII LMM: Model Predictions Table, echo = FALSE}
+kable(
+  HII.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in HII from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the HII linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r HII LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(HII.LMM)
+# Marginal = 0.307
+# Conditional = 0.679
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r HII LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+HII.LMM.anova.table <- anova(
+  object = HII.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r HII LMM: ANOVA Table, echo = FALSE}
+kable(
+  HII.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the HII linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r HII LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(HII.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the HII linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r HII LMM: ranova, echo = TRUE}
+## Fit a ranova
+HII.LMM.ranova <- ranova(
+  HII.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r HII LMM: ranova Table, echo = FALSE}
+kable(
+  HII.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the HII linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r HII LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(HII.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the HII linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Mean NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Mean NDVI LMM, echo = TRUE}
+mean.NDVI.LMM <- lmer(
+  Mean_NDVI ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(mean.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(mean.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(mean.NDVI.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(mean.NDVI.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(mean.NDVI.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P = 0.031)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.473)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(mean.NDVI.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(mean.NDVI.LMM)
+# 1 outlier detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: mean.NDVI LMM, echo = TRUE}
+mean.NDVI.LMM.emmeans <- emmeans(
+  mean.NDVI.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: mean.NDVI LMM, echo = FALSE}
+kable(
+  tidy(mean.NDVI.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the mean.NDVI LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: mean.NDVI LMM, echo = FALSE}
+kable(
+  eff_size(
+  	mean.NDVI.LMM.emmeans,
+    sigma = sigma(mean.NDVI.LMM),
+    edf = df.residual(mean.NDVI.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the mean.NDVI LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+mean.NDVI.LMM.emtrends <- emtrends(
+	mean.NDVI.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: Model Predictions Table, echo = FALSE}
+kable(
+  mean.NDVI.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Mean NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Mean NDVI linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Mean NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(mean.NDVI.LMM)
+# Marginal = 0.194
+# Conditional = 0.616
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Mean NDVI LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+mean.NDVI.LMM.anova.table <- anova(
+  object = mean.NDVI.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: ANOVA Table, echo = FALSE}
+kable(
+  mean.NDVI.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Mean NDVI linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Mean NDVI LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(mean.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Mean NDVI linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Mean NDVI LMM: ranova, echo = TRUE}
+## Fit a ranova
+mean.NDVI.LMM.ranova <- ranova(
+  mean.NDVI.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Mean NDVI LMM: ranova Table, echo = FALSE}
+kable(
+  mean.NDVI.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Mean NDVI linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Mean NDVI LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(mean.NDVI.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Mean NDVI linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Min NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Min NDVI LMM, echo = TRUE}
+min.NDVI.LMM <- lmer(
+  Min_NDVI ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Min NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(min.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(min.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(min.NDVI.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(min.NDVI.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(min.NDVI.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P = 0.021)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(min.NDVI.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(min.NDVI.LMM)
+# 1 outlier detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: min.NDVI LMM, echo = TRUE}
+min.NDVI.LMM.emmeans <- emmeans(
+  min.NDVI.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: min.NDVI LMM, echo = FALSE}
+kable(
+  tidy(min.NDVI.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the min.NDVI LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: min.NDVI LMM, echo = FALSE}
+kable(
+  eff_size(
+  	min.NDVI.LMM.emmeans,
+    sigma = sigma(min.NDVI.LMM),
+    edf = df.residual(min.NDVI.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the min.NDVI LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+min.NDVI.LMM.emtrends <- emtrends(
+	min.NDVI.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: Model Predictions Table, echo = FALSE}
+kable(
+  min.NDVI.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Min NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Min NDVI linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Min NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(min.NDVI.LMM)
+# Marginal = 0.036
+# Conditional = 0.722
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Min NDVI LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+min.NDVI.LMM.anova.table <- anova(
+  object = min.NDVI.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: ANOVA Table, echo = FALSE}
+kable(
+  min.NDVI.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Min NDVI linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Min NDVI LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(min.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Min NDVI linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Min NDVI LMM: ranova, echo = TRUE}
+## Fit a ranova
+min.NDVI.LMM.ranova <- ranova(
+  min.NDVI.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Min NDVI LMM: ranova Table, echo = FALSE}
+kable(
+  min.NDVI.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Min NDVI linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Min NDVI LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(min.NDVI.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Min NDVI linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Max NDVI
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Max NDVI LMM, echo = TRUE}
+max.NDVI.LMM <- lmer(
+  Max_NDVI ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Max NDVI LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(max.NDVI.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(max.NDVI.LMM)
+# No singularity
+
+## Visual assessment
+check_model(max.NDVI.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(max.NDVI.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(max.NDVI.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P = 0.016)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P = 0.014)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.080)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(max.NDVI.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(max.NDVI.LMM)
+# 3 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: max.NDVI LMM, echo = TRUE}
+max.NDVI.LMM.emmeans <- emmeans(
+  max.NDVI.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: max.NDVI LMM, echo = FALSE}
+kable(
+  tidy(max.NDVI.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the max.NDVI LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: max.NDVI LMM, echo = FALSE}
+kable(
+  eff_size(
+  	max.NDVI.LMM.emmeans,
+    sigma = sigma(max.NDVI.LMM),
+    edf = df.residual(max.NDVI.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the max.NDVI LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+max.NDVI.LMM.emtrends <- emtrends(
+	max.NDVI.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: Model Predictions Table, echo = FALSE}
+kable(
+  max.NDVI.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Max NDVI from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Max NDVI linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Max NDVI LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(max.NDVI.LMM)
+# Marginal = 0.291
+# Conditional = 0.630
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Max NDVI LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+max.NDVI.LMM.anova.table <- anova(
+  object = max.NDVI.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: ANOVA Table, echo = FALSE}
+kable(
+  max.NDVI.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Max NDVI linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Max NDVI LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(max.NDVI.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Max NDVI linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Max NDVI LMM: ranova, echo = TRUE}
+## Fit a ranova
+max.NDVI.LMM.ranova <- ranova(
+  max.NDVI.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Max NDVI LMM: ranova Table, echo = FALSE}
+kable(
+  max.NDVI.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Max NDVI linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Max NDVI LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(max.NDVI.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Max NDVI linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Mean Annual Temperature
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Mean Annual Temperature LMM, echo = TRUE}
+mean.annual.temperature.LMM <- lmer(
+  Mean_Annual_Temperature ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Mean Annual Temperature LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(mean.annual.temperature.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(mean.annual.temperature.LMM)
+# No singularity
+
+## Visual assessment
+check_model(mean.annual.temperature.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(mean.annual.temperature.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(mean.annual.temperature.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Normality for random effects 'City: (Intercept)' detected (P = 0.245)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(mean.annual.temperature.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P = 0.009)
+
+## Check for outliers
+check_outliers(mean.annual.temperature.LMM)
+# 20 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: mean.annual.temperature LMM, echo = TRUE}
+mean.annual.temperature.LMM.emmeans <- emmeans(
+  mean.annual.temperature.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: mean.annual.temperature LMM, echo = FALSE}
+kable(
+  tidy(mean.annual.temperature.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the mean.annual.temperature LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: mean.annual.temperature LMM, echo = FALSE}
+kable(
+  eff_size(
+  	mean.annual.temperature.LMM.emmeans,
+    sigma = sigma(mean.annual.temperature.LMM),
+    edf = df.residual(mean.annual.temperature.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the mean.annual.temperature LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+mean.annual.temperature.LMM.emtrends <- emtrends(
+	mean.annual.temperature.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: Model Predictions Table, echo = FALSE}
+kable(
+  mean.annual.temperature.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Mean Annual Temperature from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Mean Annual Temperature linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Mean Annual Temperature LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(mean.annual.temperature.LMM)
+# Marginal = 0.005
+# Conditional = 0.978
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Mean Annual Temperature LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+mean.annual.temperature.LMM.anova.table <- anova(
+  object = mean.annual.temperature.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: ANOVA Table, echo = FALSE}
+kable(
+  mean.annual.temperature.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Mean Annual Temperature linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Mean Annual Temperature LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(mean.annual.temperature.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Mean Annual Temperature linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Mean Annual Temperature LMM: ranova, echo = TRUE}
+## Fit a ranova
+mean.annual.temperature.LMM.ranova <- ranova(
+  mean.annual.temperature.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Mean Annual Temperature LMM: ranova Table, echo = FALSE}
+kable(
+  mean.annual.temperature.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Mean Annual Temperature linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Mean Annual Temperature LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(mean.annual.temperature.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Mean Annual Temperature linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Temperature Seasonality
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Temperature Seasonality LMM, echo = TRUE}
+temperature.seasonality.LMM <- lmer(
+  Temperature_Seasonality ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Temperature Seasonality LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(temperature.seasonality.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(temperature.seasonality.LMM)
+# No singularity
+
+## Visual assessment
+check_model(temperature.seasonality.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(temperature.seasonality.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(temperature.seasonality.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Normality for random effects 'City: (Intercept)' detected (P = 0.073)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(temperature.seasonality.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(temperature.seasonality.LMM)
+# 13 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: temperature.seasonality LMM, echo = TRUE}
+temperature.seasonality.LMM.emmeans <- emmeans(
+  temperature.seasonality.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: temperature.seasonality LMM, echo = FALSE}
+kable(
+  tidy(temperature.seasonality.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the temperature.seasonality LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: temperature.seasonality LMM, echo = FALSE}
+kable(
+  eff_size(
+  	temperature.seasonality.LMM.emmeans,
+    sigma = sigma(temperature.seasonality.LMM),
+    edf = df.residual(temperature.seasonality.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the temperature.seasonality LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+temperature.seasonality.LMM.emtrends <- emtrends(
+	temperature.seasonality.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: Model Predictions Table, echo = FALSE}
+kable(
+  temperature.seasonality.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Temperature Seasonality from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Temperature Seasonality linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Temperature Seasonality LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(temperature.seasonality.LMM)
+# Marginal < 0.001
+# Conditional = 0.998
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Temperature Seasonality LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+temperature.seasonality.LMM.anova.table <- anova(
+  object = temperature.seasonality.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: ANOVA Table, echo = FALSE}
+kable(
+  temperature.seasonality.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Temperature Seasonality linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Temperature Seasonality LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(temperature.seasonality.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Temperature Seasonality linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Temperature Seasonality LMM: ranova, echo = TRUE}
+## Fit a ranova
+temperature.seasonality.LMM.ranova <- ranova(
+  temperature.seasonality.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Temperature Seasonality LMM: ranova Table, echo = FALSE}
+kable(
+  temperature.seasonality.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Temperature Seasonality linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Temperature Seasonality LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(temperature.seasonality.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Temperature Seasonality linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Range Annual Temperature
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Range Annual Temperature LMM, echo = TRUE}
+range.annual.temperature.LMM <- lmer(
+  Range_Annual_Temperature ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Range Annual Temperature LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(range.annual.temperature.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(range.annual.temperature.LMM)
+# No singularity
+
+## Visual assessment
+check_model(range.annual.temperature.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(range.annual.temperature.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(range.annual.temperature.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P = 0.031)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(range.annual.temperature.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(range.annual.temperature.LMM)
+# 5 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: range.annual.temperature LMM, echo = TRUE}
+range.annual.temperature.LMM.emmeans <- emmeans(
+  range.annual.temperature.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: range.annual.temperature LMM, echo = FALSE}
+kable(
+  tidy(range.annual.temperature.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the range.annual.temperature LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: range.annual.temperature LMM, echo = FALSE}
+kable(
+  eff_size(
+  	range.annual.temperature.LMM.emmeans,
+    sigma = sigma(range.annual.temperature.LMM),
+    edf = df.residual(range.annual.temperature.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the range.annual.temperature LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+range.annual.temperature.LMM.emtrends <- emtrends(
+	range.annual.temperature.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: Model Predictions Table, echo = FALSE}
+kable(
+  range.annual.temperature.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Range Annual Temperature from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Range Annual Temperature linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Range Annual Temperature LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(range.annual.temperature.LMM)
+# Marginal < 0.001
+# Conditional = 0.995
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Range Annual Temperature LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+range.annual.temperature.LMM.anova.table <- anova(
+  object = range.annual.temperature.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: ANOVA Table, echo = FALSE}
+kable(
+  range.annual.temperature.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Range Annual Temperature linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Range Annual Temperature LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(range.annual.temperature.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Range Annual Temperature linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Range Annual Temperature LMM: ranova, echo = TRUE}
+## Fit a ranova
+range.annual.temperature.LMM.ranova <- ranova(
+  range.annual.temperature.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Range Annual Temperature LMM: ranova Table, echo = FALSE}
+kable(
+  range.annual.temperature.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Range Annual Temperature linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Range Annual Temperature LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(range.annual.temperature.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Range Annual Temperature linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Annual Precipitation
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Annual Precipitation LMM, echo = TRUE}
+annual.precipitation.LMM <- lmer(
+  Annual_Precipitation ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Annual Precipitation LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(annual.precipitation.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(annual.precipitation.LMM)
+# No singularity
+
+## Visual assessment
+check_model(annual.precipitation.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(annual.precipitation.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(annual.precipitation.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(annual.precipitation.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(annual.precipitation.LMM)
+# 15 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: annual.precipitation LMM, echo = TRUE}
+annual.precipitation.LMM.emmeans <- emmeans(
+  annual.precipitation.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: annual.precipitation LMM, echo = FALSE}
+kable(
+  tidy(annual.precipitation.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the annual.precipitation LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: annual.precipitation LMM, echo = FALSE}
+kable(
+  eff_size(
+  	annual.precipitation.LMM.emmeans,
+    sigma = sigma(annual.precipitation.LMM),
+    edf = df.residual(annual.precipitation.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the annual.precipitation LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+annual.precipitation.LMM.emtrends <- emtrends(
+	annual.precipitation.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: Model Predictions Table, echo = FALSE}
+kable(
+  annual.precipitation.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Annual Precipitation from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Annual Precipitation linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Annual Precipitation LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(annual.precipitation.LMM)
+# Marginal = 0.001
+# Conditional = 0.962
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Annual Precipitation LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+annual.precipitation.LMM.anova.table <- anova(
+  object = annual.precipitation.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: ANOVA Table, echo = FALSE}
+kable(
+  annual.precipitation.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Annual Precipitation linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Annual Precipitation LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(annual.precipitation.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Annual Precipitation linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Annual Precipitation LMM: ranova, echo = TRUE}
+## Fit a ranova
+annual.precipitation.LMM.ranova <- ranova(
+  annual.precipitation.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Annual Precipitation LMM: ranova Table, echo = FALSE}
+kable(
+  annual.precipitation.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Annual Precipitation linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Annual Precipitation LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(annual.precipitation.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Annual Precipitation linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Precipitation Seasonality
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Precipitation Seasonality LMM, echo = TRUE}
+precipitation.seasonality.LMM <- lmer(
+  Precipitation_Seasonality ~ Standardized_Distance * Sampling_Design
+    + (1 | City:Sampling_Design)
+    + (1 | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+# No convergence with random slopes
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Precipitation Seasonality LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(precipitation.seasonality.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(precipitation.seasonality.LMM)
+# No singularity
+
+## Visual assessment
+check_model(precipitation.seasonality.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(precipitation.seasonality.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(precipitation.seasonality.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(precipitation.seasonality.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(precipitation.seasonality.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: precipitation.seasonality LMM, echo = TRUE}
+precipitation.seasonality.LMM.emmeans <- emmeans(
+  precipitation.seasonality.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: precipitation.seasonality LMM, echo = FALSE}
+kable(
+  tidy(precipitation.seasonality.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the precipitation.seasonality LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: precipitation.seasonality LMM, echo = FALSE}
+kable(
+  eff_size(
+  	precipitation.seasonality.LMM.emmeans,
+    sigma = sigma(precipitation.seasonality.LMM),
+    edf = df.residual(precipitation.seasonality.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the precipitation.seasonality LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+precipitation.seasonality.LMM.emtrends <- emtrends(
+	precipitation.seasonality.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: Model Predictions Table, echo = FALSE}
+kable(
+  precipitation.seasonality.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Precipitation Seasonality from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Precipitation Seasonality linear mixed-effects model.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Precipitation Seasonality LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(precipitation.seasonality.LMM)
+# Marginal < 0.001
+# Conditional = 0.992
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Precipitation Seasonality LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+precipitation.seasonality.LMM.anova.table <- anova(
+  object = precipitation.seasonality.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: ANOVA Table, echo = FALSE}
+kable(
+  precipitation.seasonality.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Precipitation Seasonality linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Precipitation Seasonality LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(precipitation.seasonality.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Precipitation Seasonality linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Precipitation Seasonality LMM: ranova, echo = TRUE}
+## Fit a ranova
+precipitation.seasonality.LMM.ranova <- ranova(
+  precipitation.seasonality.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Precipitation Seasonality LMM: ranova Table, echo = FALSE}
+kable(
+  precipitation.seasonality.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Precipitation Seasonality linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Precipitation Seasonality LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(precipitation.seasonality.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Precipitation Seasonality linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Aridity Index
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: Aridity Index LMM, echo = TRUE}
+aridity.index.LMM <- lmer(
+  Aridity_Index ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: Aridity Index LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(aridity.index.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(aridity.index.LMM)
+# No singularity
+
+## Visual assessment
+check_model(aridity.index.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(aridity.index.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(aridity.index.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City: Standardized_Distance' detected (P < 0.001)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(aridity.index.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(aridity.index.LMM)
+# 16 outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: aridity.index LMM, echo = TRUE}
+aridity.index.LMM.emmeans <- emmeans(
+  aridity.index.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: aridity.index LMM, echo = FALSE}
+kable(
+  tidy(aridity.index.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the aridity.index LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: aridity.index LMM, echo = FALSE}
+kable(
+  eff_size(
+  	aridity.index.LMM.emmeans,
+    sigma = sigma(aridity.index.LMM),
+    edf = df.residual(aridity.index.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the aridity.index LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+aridity.index.LMM.emtrends <- emtrends(
+	aridity.index.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: Model Predictions Table, echo = FALSE}
+kable(
+  aridity.index.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in Aridity Index from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the Aridity Index linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r Aridity Index LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(aridity.index.LMM)
+# Marginal = 0.006
+# Conditional = 0.908
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r Aridity Index LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+aridity.index.LMM.anova.table <- anova(
+  object = aridity.index.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: ANOVA Table, echo = FALSE}
+kable(
+  aridity.index.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the Aridity Index linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r Aridity Index LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(aridity.index.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the Aridity Index linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r Aridity Index LMM: ranova, echo = TRUE}
+## Fit a ranova
+aridity.index.LMM.ranova <- ranova(
+  aridity.index.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r Aridity Index LMM: ranova Table, echo = FALSE}
+kable(
+  aridity.index.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the Aridity Index linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r Aridity Index LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(aridity.index.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the Aridity Index linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## GDP 2005
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: GDP 2005 LMM, echo = TRUE}
+GDP.2005.LMM <- lmer(
+  log10(GDP_2005 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: GDP 2005 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(GDP.2005.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(GDP.2005.LMM)
+# No singularity
+
+## Visual assessment
+check_model(GDP.2005.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(GDP.2005.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(GDP.2005.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.132)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(GDP.2005.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(GDP.2005.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: GDP.2005 LMM, echo = TRUE}
+GDP.2005.LMM.emmeans <- emmeans(
+  GDP.2005.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: GDP.2005 LMM, echo = FALSE}
+kable(
+  tidy(GDP.2005.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the GDP.2005 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: GDP.2005 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	GDP.2005.LMM.emmeans,
+    sigma = sigma(GDP.2005.LMM),
+    edf = df.residual(GDP.2005.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the GDP.2005 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r GDP 2005 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+GDP.2005.LMM.emtrends <- emtrends(
+  GDP.2005.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r GDP 2005 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  GDP.2005.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in GDP 2005 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the GDP 2005 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r GDP 2005 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(GDP.2005.LMM)
+# Marginal = 0.356
+# Conditional = 0.650
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r GDP 2005 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+GDP.2005.LMM.anova.table <- anova(
+  object = GDP.2005.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r GDP 2005 LMM: ANOVA Table, echo = FALSE}
+kable(
+  GDP.2005.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the GDP 2005 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r GDP 2005 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(GDP.2005.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the GDP 2005 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r GDP 2005 LMM: ranova, echo = TRUE}
+## Fit a ranova
+GDP.2005.LMM.ranova <- ranova(
+  GDP.2005.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r GDP 2005 LMM: ranova Table, echo = FALSE}
+kable(
+  GDP.2005.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the GDP 2005 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r GDP 2005 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(GDP.2005.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the GDP 2005 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP1 2030
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP1 2030 LMM, echo = TRUE}
+SSP1.2030.LMM <- lmer(
+  log10(SSP_1_2030 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP1 2030 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP1.2030.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP1.2030.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP1.2030.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP1.2030.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP1.2030.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.201)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP1.2030.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP1.2030.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP1.2030 LMM, echo = TRUE}
+SSP1.2030.LMM.emmeans <- emmeans(
+  SSP1.2030.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP1.2030 LMM, echo = FALSE}
+kable(
+  tidy(SSP1.2030.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP1.2030 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP1.2030 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP1.2030.LMM.emmeans,
+    sigma = sigma(SSP1.2030.LMM),
+    edf = df.residual(SSP1.2030.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP1.2030 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP1 2030 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP1.2030.LMM.emtrends <- emtrends(
+	SSP1.2030.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2030 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP1.2030.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP1 2030 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP1 2030 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP1 2030 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP1.2030.LMM)
+# Marginal = 0.355
+# Conditional = 0.600
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP1 2030 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP1.2030.LMM.anova.table <- anova(
+  object = SSP1.2030.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2030 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP1.2030.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP1 2030 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP1 2030 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP1.2030.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP1 2030 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP1 2030 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP1.2030.LMM.ranova <- ranova(
+  SSP1.2030.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2030 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP1.2030.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP1 2030 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP1 2030 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP1.2030.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP1 2030 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP1 2100
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP1 2100 LMM, echo = TRUE}
+SSP1.2100.LMM <- lmer(
+  log10(SSP_1_2100 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP1 2100 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP1.2100.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP1.2100.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP1.2100.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP1.2100.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP1.2100.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.150)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP1.2100.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP1.2100.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP1.2100 LMM, echo = TRUE}
+SSP1.2100.LMM.emmeans <- emmeans(
+  SSP1.2100.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP1.2100 LMM, echo = FALSE}
+kable(
+  tidy(SSP1.2100.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP1.2100 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP1.2100 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP1.2100.LMM.emmeans,
+    sigma = sigma(SSP1.2100.LMM),
+    edf = df.residual(SSP1.2100.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP1.2100 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP1 2100 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP1.2100.LMM.emtrends <- emtrends(
+	SSP1.2100.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2100 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP1.2100.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP1 2100 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP1 2100 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP1 2100 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP1.2100.LMM)
+# Marginal = 0.349
+# Conditional = 0.593
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP1 2100 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP1.2100.LMM.anova.table <- anova(
+  object = SSP1.2100.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2100 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP1.2100.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP1 2100 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP1 2100 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP1.2100.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP1 2100 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP1 2100 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP1.2100.LMM.ranova <- ranova(
+  SSP1.2100.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP1 2100 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP1.2100.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP1 2100 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP1 2100 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP1.2100.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP1 2100 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP2 2030
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP2 2030 LMM, echo = TRUE}
+SSP2.2030.LMM <- lmer(
+  log10(SSP_2_2030 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP2 2030 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP2.2030.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP2.2030.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP2.2030.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP2.2030.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP2.2030.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.195)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP2.2030.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP2.2030.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP2.2030 LMM, echo = TRUE}
+SSP2.2030.LMM.emmeans <- emmeans(
+  SSP2.2030.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP2.2030 LMM, echo = FALSE}
+kable(
+  tidy(SSP2.2030.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP2.2030 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP2.2030 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP2.2030.LMM.emmeans,
+    sigma = sigma(SSP2.2030.LMM),
+    edf = df.residual(SSP2.2030.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP2.2030 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP2 2030 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP2.2030.LMM.emtrends <- emtrends(
+	SSP2.2030.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2030 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP2.2030.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP2 2030 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP2 2030 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP2 2030 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP2.2030.LMM)
+# Marginal = 0.355
+# Conditional = 0.600
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP2 2030 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP2.2030.LMM.anova.table <- anova(
+  object = SSP2.2030.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2030 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP2.2030.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP2 2030 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP2 2030 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP2.2030.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP2 2030 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP2 2030 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP2.2030.LMM.ranova <- ranova(
+  SSP2.2030.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2030 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP2.2030.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP2 2030 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP2 2030 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP2.2030.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP2 2030 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP2 2100
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP2 2100 LMM, echo = TRUE}
+SSP2.2100.LMM <- lmer(
+  log10(SSP_2_2100 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP2 2100 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP2.2100.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP2.2100.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP2.2100.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP2.2100.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP2.2100.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.165)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP2.2100.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP2.2100.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP2.2100 LMM, echo = TRUE}
+SSP2.2100.LMM.emmeans <- emmeans(
+  SSP2.2100.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP2.2100 LMM, echo = FALSE}
+kable(
+  tidy(SSP2.2100.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP2.2100 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP2.2100 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP2.2100.LMM.emmeans,
+    sigma = sigma(SSP2.2100.LMM),
+    edf = df.residual(SSP2.2100.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP2.2100 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP2 2100 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP2.2100.LMM.emtrends <- emtrends(
+	SSP2.2100.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2100 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP2.2100.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP2 2100 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP2 2100 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP2 2100 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP2.2100.LMM)
+# Marginal = 0.350
+# Conditional = 0.594
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP2 2100 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP2.2100.LMM.anova.table <- anova(
+  object = SSP2.2100.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2100 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP2.2100.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP2 2100 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP2 2100 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP2.2100.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP2 2100 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP2 2100 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP2.2100.LMM.ranova <- ranova(
+  SSP2.2100.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP2 2100 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP2.2100.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP2 2100 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP2 2100 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP2.2100.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP2 2100 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP5 2030
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP5 2030 LMM, echo = TRUE}
+SSP5.2030.LMM <- lmer(
+  log10(SSP_5_2030 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP5 2030 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP5.2030.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP5.2030.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP5.2030.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP5.2030.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP5.2030.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.182)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP5.2030.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP5.2030.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP5.2030 LMM, echo = TRUE}
+SSP5.2030.LMM.emmeans <- emmeans(
+  SSP5.2030.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP5.2030 LMM, echo = FALSE}
+kable(
+  tidy(SSP5.2030.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP5.2030 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP5.2030 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP5.2030.LMM.emmeans,
+    sigma = sigma(SSP5.2030.LMM),
+    edf = df.residual(SSP5.2030.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP5.2030 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP5 2030 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP5.2030.LMM.emtrends <- emtrends(
+	SSP5.2030.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2030 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP5.2030.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP5 2030 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP5 2030 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP5 2030 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP5.2030.LMM)
+# Marginal = 0.361
+# Conditional = 0.562
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP5 2030 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP5.2030.LMM.anova.table <- anova(
+  object = SSP5.2030.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2030 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP5.2030.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP5 2030 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP5 2030 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP5.2030.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP5 2030 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP5 2030 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP5.2030.LMM.ranova <- ranova(
+  SSP5.2030.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2030 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP5.2030.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP5 2030 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP5 2030 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP5.2030.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP5 2030 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## SSP5 2100
+
+### Fit the Linear Mixed-Effects Model
+
+```{r Fit the Model: SSP5 2100 LMM, echo = TRUE}
+SSP5.2100.LMM <- lmer(
+  log10(SSP_5_2100 + 1) ~ Standardized_Distance * Sampling_Design
+    + (Standardized_Distance | City:Sampling_Design)
+    + (Standardized_Distance | City),
+  data = urban.quantification.full.data,
+  REML = TRUE,
+  control = lmerControl(optCtrl = list(maxfun = 100000), optimizer = "bobyqa")
+)
+```
+
+\vspace{10pt}
+
+### Check Model Assumptions
+
+```{r performance Diagnostics: SSP5 2100 LMM, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(SSP5.2100.LMM)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(SSP5.2100.LMM)
+# No singularity
+
+## Visual assessment
+check_model(SSP5.2100.LMM)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(SSP5.2100.LMM, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(SSP5.2100.LMM, effects = "random")
+# Non-normality for random effects 'City:Sampling_Design: (Intercept)' detected (P < 0.001)
+# Non-normality for random effects 'City:Sampling_Design: Standardized_Distance' detected (P < 0.001)
+# Non-normality for random effects 'City: (Intercept)' detected (P < 0.001)
+# Normality for random effects 'City: Standardized_Distance' detected (P = 0.058)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(SSP5.2100.LMM)
+# Heteroscedasticity (non-constant error variance) detected (P < 0.001)
+
+## Check for outliers
+check_outliers(SSP5.2100.LMM)
+# No outliers detected
+```
+
+\vspace{10pt}
+
+### Model Contrasts & Predictions
+
+```{r emmeans: SSP5.2100 LMM, echo = TRUE}
+SSP5.2100.LMM.emmeans <- emmeans(
+  SSP5.2100.LMM,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Contrasts: SSP5.2100 LMM, echo = FALSE}
+kable(
+  tidy(SSP5.2100.LMM.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the SSP5.2100 LMM.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: SSP5.2100 LMM, echo = FALSE}
+kable(
+  eff_size(
+  	SSP5.2100.LMM.emmeans,
+    sigma = sigma(SSP5.2100.LMM),
+    edf = df.residual(SSP5.2100.LMM)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the SSP5.2100 LMM.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r SSP5 2100 LMM: Model Predictions, echo = TRUE}
+## Set the emtrends
+SSP5.2100.LMM.emtrends <- emtrends(
+	SSP5.2100.LMM,
+	specs = "Sampling_Design",
+	var = "Standardized_Distance",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2100 LMM: Model Predictions Table, echo = FALSE}
+kable(
+  SSP5.2100.LMM.emtrends,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Predicted change in SSP5 2100 from the urban center (standardized distance = 0) and the rural limit (standardized distance = 1) for each Sample Type from the SSP5 2100 linear mixed-effects model. Note: predictions have not been back-transformed.",
+  col.names = c("Sample Type", "Predicted Change", "SE", "df", "CI_lower", "CI_upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Marginal & Conditional R^2^
+
+```{r SSP5 2100 LMM: Marginal and Conditional R-squared, echo = TRUE, results = "hide"}
+## Calculate the marginal and conditional R-squared
+r2_nakagawa(SSP5.2100.LMM)
+# Marginal = 0.338
+# Conditional = 0.582
+```
+
+\vspace{10pt}
+
+### ANOVA
+
+```{r SSP5 2100 LMM: ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+SSP5.2100.LMM.anova.table <- anova(
+  object = SSP5.2100.LMM,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2100 LMM: ANOVA Table, echo = FALSE}
+kable(
+  SSP5.2100.LMM.anova.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "ANOVA table for the SSP5 2100 linear mixed-effects model.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### Partial $\eta^2$ for Fixed Effects
+
+```{r SSP5 2100 LMM: Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(SSP5.2100.LMM.anova.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the SSP5 2100 linear mixed-effects model.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\newpage
+
+### ranova
+
+```{r SSP5 2100 LMM: ranova, echo = TRUE}
+## Fit a ranova
+SSP5.2100.LMM.ranova <- ranova(
+  SSP5.2100.LMM,
+  reduce.terms = FALSE
+)
+```
+
+\vspace{10pt}
+
+```{r SSP5 2100 LMM: ranova Table, echo = FALSE}
+kable(
+  SSP5.2100.LMM.ranova,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary of the ranova for the SSP5 2100 linear mixed-effects model.",
+  col.names = c("n_parameters", "log_likelihood", "AIC", "LRT", "df", "P-value")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r SSP5 2100 LMM: ICC For Random Effects, echo = FALSE}
+kable(
+  icc(SSP5.2100.LMM, by_group = TRUE),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Table of the effect sizes for the random effects in the SSP5 2100 linear mixed-effects model.",
+  col.names = c("Term", "ICC")
+) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+
+
+
+\newpage
+# Environmental Heterogeneity
+
+
+## Data Management
+
+```{r Data Management: Environmental Heterogeneity, echo = TRUE, eval = FALSE}
+## Remove NAs for the environmental heterogeneity analysis
+environmental.variable.data <- urban.quantification.full.data %>%
+	select(
+		City, Sampling_Design, Distance, ISC_Mean:Mean_NDVI, 
+		Mean_Annual_Temperature, Annual_Precipitation,
+		SSP_2_2030:SSP_2_2100
+		) %>%
+	drop_na()
+
+## Normalize the matrix before calculating the Euclidean distance
+standardized.environmental.variable.matrix <- decostand(
+	environmental.variable.data %>% select(-c(City, Sampling_Design)),
+	method = "standardize"
+)
+
+## Calculate the Euclidean distances among sampling locations by environmental variables
+environmental.variable.euclidean.distance <- vegdist(
+	standardized.environmental.variable.matrix,
+	method = "euclidean"
+)
+
+## Set grouping by city and sample type
+environmental.variable.groups <- paste(
+	environmental.variable.data$City, environmental.variable.data$Sampling_Design
+)
+
+## Calculate environmental heterogeneity
+sampling.design.dispersions <- betadisper(
+	environmental.variable.euclidean.distance,
+	group = environmental.variable.groups,
+	type = "centroid"
+)$distances
+
+## Compile the environmental heterogeneity data
+environmental.heterogeneity.data <- tibble(
+	City = environmental.variable.data$City,
+	Sampling_Design = environmental.variable.data$Sampling_Design,
+	Environmental_Heterogeneity = sampling.design.dispersions
+)
+```
+
+
+\newpage
+## Fit the Model
+
+```{r Fit the Model: Environmental Heterogeneity, echo = TRUE}
+environmental.heterogeneity.ANOVA.model <- lmer(
+  log(Environmental_Heterogeneity) ~ Sampling_Design + (1 | City),
+  data = environmental.heterogeneity.data,
+  REML = TRUE
+)
+```
+
+## Check Model Assumptions
+
+```{r performance Diagnostics: Environmental Heterogeneity ANOVA, echo = TRUE, eval = FALSE}
+## Check model convergence
+check_convergence(environmental.heterogeneity.ANOVA.model)
+# Model converged
+
+## Check for boundary singularity
+check_singularity(environmental.heterogeneity.ANOVA.model)
+# No singularity
+
+## Visual assessment
+check_model(environmental.heterogeneity.ANOVA.model)
+# Visual check = good
+
+## Check normality of fixed effects (Shapiro-Wilk test)
+check_normality(environmental.heterogeneity.ANOVA.model, effects = "fixed")
+# Non-normality of residuals detected (P < 0.001)
+
+## Check normality of random effects (Shapiro-Wilk test)
+check_normality(environmental.heterogeneity.ANOVA.model, effects = "random")
+# Random effects 'City: (Intercept)' appear as normally distributed (P = 0.072)
+
+## Check for non-constant variance of residuals (i.e., heteroscedasticity)
+check_heteroscedasticity(environmental.heterogeneity.ANOVA.model)
+# Error variance appears to be homoscedastic (P = 0.331)
+
+## Check for outliers
+check_outliers(environmental.heterogeneity.ANOVA.model)
+# No outliers detected
+```
+
+
+\newpage
+## ANOVA
+
+```{r Environmental Heterogeneity ANOVA, echo = TRUE}
+## Fit an ANOVA with Type III sums-of-squares
+environmental.heterogeneity.ANOVA.model.table <- anova(
+  object = environmental.heterogeneity.ANOVA.model,
+  type = "III",
+  ddf = "Satterthwaite"
+)
+```
+
+\vspace{10pt}
+
+```{r Environmental Heterogeneity ANOVA Table, echo = FALSE}
+kable(
+  environmental.heterogeneity.ANOVA.model.table,
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Summary table for the environmental heterogeneity ANOVA.",
+  col.names = c("Sums-of-Squares", "Mean-Square", "Num_df", "Den_df", "F", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+## $\eta^2$ for Fixed Effects
+
+```{r Environmental Heterogeneity ANOVA Effect Sizes, echo = FALSE}
+kable(
+  eta_squared(environmental.heterogeneity.ANOVA.model.table, partial = TRUE, ci = 0.95),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect size of sample type for the environmental heterogeneity ANOVA.",
+  col.names = c("Term", "eta-squared", "Confidence Level", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+### ICC for Random Effects
+
+```{r echo = FALSE}
+kable(
+  icc(environmental.heterogeneity.ANOVA.model),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect size of the random intercept for city in the environmental heterogeneity ANOVA.") %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+
+\newpage
+## Estimated Marginal Means & Contrasts
+
+```{r Calculate emmeans: Environmental Heterogeneity ANOVA, echo = FALSE}
+## Calculate estimated marginal means
+environmental.heterogeneity.ANOVA.emmeans <- emmeans(
+  environmental.heterogeneity.ANOVA.model,
+  specs = pairwise ~ Sampling_Design,
+  weights = "cells",
+  adjust = "none",
+  pbkrtest.limit = 21500
+)
+```
+
+\vspace{10pt}
+
+```{r Estimated Marginal Means: Environmental Heterogeneity ANOVA, echo = FALSE}
+kable(
+  tidy(environmental.heterogeneity.ANOVA.emmeans$emmeans),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Estimated marginal means of sample type in the environmental heterogeneity ANOVA.",
+  col.names = c("Sample Type", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped"))
+```
+
+\vspace{10pt}
+
+```{r Contrasts: Environmental Heterogeneity ANOVA, echo = FALSE}
+kable(
+  tidy(environmental.heterogeneity.ANOVA.emmeans$contrasts),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Pairwise contrasts of sample type in the environmental heterogeneity ANOVA.",
+  col.names = c("Term", "Contrast", "Null Value", "Estimate", "SE", "df", "t", "P-value")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+\vspace{10pt}
+
+```{r Contrast Effect Sizes: Environmental Heterogeneity ANOVA, echo = FALSE}
+kable(
+  eff_size(
+  	environmental.heterogeneity.ANOVA.emmeans,
+    sigma = sigma(environmental.heterogeneity.ANOVA.model),
+    edf = df.residual(environmental.heterogeneity.ANOVA.model)
+  	),
+  booktabs = TRUE,
+  digits = 3,
+  caption = "Effect sizes for the pairwise contrasts of sample type in the environmental heterogeneity ANOVA.",
+  col.names = c("Contrast", "Cohen's d", "SE", "df", "CI Lower", "CI Upper")) %>%
+  kable_styling(latex_options = c("HOLD_position", "striped", "scale_down"))
+```
+
+
+
+
+
+
+
+\newpage
+# Export Data
+
+```{r Export Urbanization Metric by Distance and Sample Type LMMs, echo = TRUE}
+# ISC
+write_rds(
+  ISC.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/ISC_distance_sampling_design_LMM.rds"
+)
+# HII
+write_rds(
+  HII.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/HII_distance_sampling_design_LMM.rds"
+)
+# Mean NDVI
+write_rds(
+  mean.NDVI.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/mean_NDVI_distance_sampling_design_LMM.rds"
+)
+# Min NDVI
+write_rds(
+  min.NDVI.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/min_NDVI_distance_sampling_design_LMM.rds"
+)
+# Max NDVI
+write_rds(
+  max.NDVI.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/max_NDVI_distance_sampling_design_LMM.rds"
+)
+# Mean annual temperature
+write_rds(
+  mean.annual.temperature.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/mean_annual_temperature_distance_sampling_design_LMM.rds"
+)
+# Temperature seasonality
+write_rds(
+  temperature.seasonality.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/temperature_seasonality_distance_sampling_design_LMM.rds"
+)
+# Range annual temperature
+write_rds(
+  range.annual.temperature.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/range_annual_temperature_distance_sampling_design_LMM.rds"
+)
+# Annual precipitation
+write_rds(
+  annual.precipitation.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/annual_precipitation_distance_sampling_design_LMM.rds"
+)
+# Precipitation seasonality
+write_rds(
+  precipitation.seasonality.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/precipitation_seasonality_distance_sampling_design_LMM.rds"
+)
+# Aridity index
+write_rds(
+  aridity.index.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/aridity_index_distance_sampling_design_LMM.rds"
+)
+# GDP 2005
+write_rds(
+  GDP.2005.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/GDP_2005_distance_sampling_design_LMM.rds"
+)
+# SSP1 2030
+write_rds(
+  SSP1.2030.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP1_2030_distance_sampling_design_LMM.rds"
+)
+# SSP1 2100
+write_rds(
+  SSP1.2100.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP1_2100_distance_sampling_design_LMM.rds"
+)
+# SSP2 2030
+write_rds(
+  SSP2.2030.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP2_2030_distance_sampling_design_LMM.rds"
+)
+# SSP2 2100
+write_rds(
+  SSP2.2100.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP2_2100_distance_sampling_design_LMM.rds"
+)
+# SSP5 2030
+write_rds(
+  SSP5.2030.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP5_2030_distance_sampling_design_LMM.rds"
+)
+# SSP5 2100
+write_rds(
+  SSP5.2100.LMM,
+  file = "data/analysis_data/metric_by_distance_LMMs/SSP5_2100_distance_sampling_design_LMM.rds"
+)
+# Environmental heterogeneity data
+write_rds(
+  environmental.heterogeneity.data,
+  file = "data/analysis_data/environmental_heterogeneity/environmental_heterogeneity_data.rds"
+)
+# Environmental heterogeneity ANOVA
+write_rds(
+  environmental.heterogeneity.ANOVA.model,
+  file = "data/analysis_data/environmental_heterogeneity/environmental_heterogeneity_sampling_design_model.rds"
+)
+```
+
+\vspace{10pt}
+
+```{r Save the Workspace, echo = TRUE}
+## Remove large distance object
+# remove(environmental.variable.euclidean.distance)
+
+## Save the workspace
+save.image("data_analysis/3-analyses/2-metric_by_distance-workspace.RData")
+```
+
+
+
+
+
+
+
+
+
+
+\newpage
+# Workspace Information
+
+```{r R Packages, echo = FALSE}
+df_session_packages <- devtools::session_info()$packages %>%
+  as.data.frame(.) %>%
+  filter(attached == TRUE) %>%
+  dplyr::select(loadedversion, date) %>%
+  rownames_to_column()
+
+colnames(df_session_packages) <- c("Package", "Loaded Version", "Date")
+
+kable(
+  df_session_packages,
+  booktabs = TRUE,
+  caption = "Packages required for data management and analyses."
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    latex_options = c("HOLD_position", "striped")
+  )
+```
