@@ -1,0 +1,24 @@
+UID,Country,City,Mean_NDVI,Min_NDVI,Max_NDVI
+Cape_Town.1,South Africa,Cape_Town,3917.4695652173914,2506.8,5091.6
+Cape_Town.2,South Africa,Cape_Town,4909.991304347826,3532.8,6691.6
+Cape_Town.3,South Africa,Cape_Town,3746.7652173913043,1671,8872.4
+Cape_Town.4,South Africa,Cape_Town,5746.695652173913,4897.4,6512.2
+Cape_Town.5,South Africa,Cape_Town,6132.417391304348,4935.2,7205.2
+Cape_Town.6,South Africa,Cape_Town,3092.113043478261,2041.8,4506.4
+Cape_Town.7,South Africa,Cape_Town,3611.5478260869563,2508,5661.6
+Cape_Town.8,South Africa,Cape_Town,4154.686956521739,2385.6,6054.2
+Cape_Town.9,South Africa,Cape_Town,2454.660869565217,-3000,5838.6
+Cape_Town.10,South Africa,Cape_Town,3532.2260869565216,-3000,6593.8
+Cape_Town.11,South Africa,Cape_Town,4214.426086956522,3348.8,5588.6
+Cape_Town.12,South Africa,Cape_Town,5241.2,3992,6891.2
+Cape_Town.13,South Africa,Cape_Town,4904.55652173913,3270.8,7032.8
+Cape_Town.14,South Africa,Cape_Town,5433.591304347826,4082.4,7084.2
+Cape_Town.15,South Africa,Cape_Town,2157.991304347826,1533.6,3430.8
+Cape_Town.16,South Africa,Cape_Town,5465.539130434783,4194,6881.8
+Cape_Town.17,South Africa,Cape_Town,3898.9478260869564,1620.6,8846.2
+Cape_Town.18,South Africa,Cape_Town,4643.121739130434,2760.4,6973.4
+Cape_Town.19,South Africa,Cape_Town,4585.165217391304,2428,8033.6
+Cape_Town.20,South Africa,Cape_Town,5408.44347826087,4191.8,7006.4
+Cape_Town.21,South Africa,Cape_Town,3917.9217391304346,1880.2,8446.4
+Cape_Town.22,South Africa,Cape_Town,1964.6695652173912,1136.8,3107.8
+Cape_Town.23,South Africa,Cape_Town,5761.947826086956,4290,7167.6
