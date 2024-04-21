@@ -81,6 +81,8 @@ adjusted.sample.size.data <- read_csv(
   file = "data/adjusted_sample_sizes.csv",
   show_col_types = FALSE
 )
+# Note: Adjusted sample sizes were calculated by running the `3-sample_size_calculations.Rmd`
+# file and determining the correction value.
 ```
 
 
@@ -125,7 +127,7 @@ sample_random_transect <- function(df, rotation_angles, data_out) {
     max = rotation_angles$Maximum_Angle
   )
 
-  # Rotate the transect by a random angle
+  # Rotate the transect by a random angle (counterclockwise rotation)
   random.transect.df <- rearrr::rotate_2d(
     data = df,
     degrees = random.angle,
