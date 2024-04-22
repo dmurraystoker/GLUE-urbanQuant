@@ -19,6 +19,7 @@ Metadata for the [analysis_data](https://github.com/dmurraystoker/GLUE-urbanQuan
 | Sampling\_Design | Name of the sampling design | Character |
 | Distance | Distance from that site to the city center (km) | Numeric |
 | Standardized\_Distance | Distance re-scaled to 0 = city center and 1 = most-distance, nonurban site | Numeric |
+| ISC\_Mean | Mean impervious surface cover within a 250-m radius of the site (\%) | Numeric |
 | HII | Calculated Human Influence Index value for that site | Integer |
 | Mean\_NDVI | Mean normalized difference vegetation index value for that site, averaged over 1 January 2014-31 December 2018 | Numeric |
 | Min\_NDVI | Minimum normalized difference vegetation index value for that site, calculated over 1 January 2014-31 December 2018 | Numeric |
