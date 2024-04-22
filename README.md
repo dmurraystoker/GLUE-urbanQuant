@@ -66,6 +66,7 @@ Detailed metadata is located within each folder in the [data](https://github.com
 
 An empty directory for raster files is provided in [raster_files](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/raster_files). Due to the large size of the raster files, users will need to download the associated raster files onto their local disk. Links to download rasters are provided [here](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/raster_files/0_raster_file_links.md).
 
+
 ### Data Analysis
 
 R Markdown code for all data extraction and analyses are provided in the [data_analysis](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/data_analysis) folder.
@@ -75,7 +76,7 @@ R Markdown code for all data extraction and analyses are provided in the [data_a
 
 Here is a basic diagram of the worflow to (1) generate points and transects and (2) calculate environmental variables.
 
-![](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/urbanQuant_workflow.pdf)
+![](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/urbanQuant_workflow.jpg)
 
 Run the [1-generate_points_transects.Rmd](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/data_analysis/1-points_transects/1-generate_points_transects.Rmd) code, then remove sites located over bodies of water by running the [2-filter_coordinates.Rmd](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/data_analysis/1-points_transects/2-filter_coordinates.Rmd) code. Finally, calculate the final sample sizes by running the [3-sample_size_calculations.Rmd](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/data_analysis/1-points_transects/3-sample_size_calculations.Rmd) code. This will determine the final number of sites after filtering, and also calculate approximate adjusted sample sizes to have similar sample sizes across sampling designs (e.g., [adjusted_sample_sizes.csv](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/data/adjusted_sample_sizes.csv)).
 
