@@ -64,12 +64,11 @@ Detailed metadata is located within each folder in the [data](https://github.com
 
 ### Rasters
 
-An empty directory for raster files is provided in [raster_files](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/raster_files). Due to the large size of the raster files, users will need to download the associated raster files onto their local disk. *Links and references to download raster files to be provided here*
-
+An empty directory for raster files is provided in [raster_files](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/raster_files). Due to the large size of the raster files, users will need to download the associated raster files onto their local disk. Links to download rasters are provided [here](https://github.com/dmurraystoker/GLUE-urbanQuant/blob/main/raster_files/0_raster_file_links.md).
 
 ### Data Analysis
 
-R Markdown code for all data extraction and analyses are provided in the [data_analysis](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/data_analysis) folder. Separate README files are provided for each subfolder to describe the purpose of the script files.
+R Markdown code for all data extraction and analyses are provided in the [data_analysis](https://github.com/dmurraystoker/GLUE-urbanQuant/tree/main/data_analysis) folder.
 
 
 ### Using this repository
