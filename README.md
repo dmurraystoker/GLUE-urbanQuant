@@ -6,6 +6,8 @@ David Murray-Stoker
 
 Updated: 22 April 2024
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11038230.svg)](https://doi.org/10.5281/zenodo.11038230)
+
 Data, metadata, and all R code for reproducing data extraction and analyses for the manuscript:
 
 Murray-Stoker, D., J. S. Santangelo, M. Szulkin, and M. T. J. Johnson. Comparing approaches to quantify urbanization on a multicontinental scale.
