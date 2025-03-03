@@ -4,7 +4,7 @@ Data and R code for the manuscript "Comparing approaches to quantify urbanizatio
 ================
 David Murray-Stoker
 
-Updated: 22 April 2024
+Updated: 3 March 2025
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.11038230.svg)](https://doi.org/10.5281/zenodo.11038230)
 
